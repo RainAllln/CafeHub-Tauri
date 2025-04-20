@@ -1,5 +1,5 @@
 {
-  "name": "handsontauri",
+  "name": "cafehub-tauri",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -10,14 +10,14 @@
     "tauri": "tauri"
   },
   "dependencies": {
-    "@ant-design/icons": "^5.6.1",
+    "@ant-design/icons": "^6.0.0",
     "@tailwindcss/vite": "^4.1.4",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "antd": "^5.24.7",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router": "^7.1.5",
+    "react-router": "^7.5.1",
     "tailwindcss": "^4.1.4"
   },
   "devDependencies": {
@@ -25,11 +25,11 @@
     "@types/node": "^22.14.1",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^4.4.1",
     "react-router-dom": "^7.5.1",
-    "sass-embedded": "^1.83.4",
-    "typescript": "~5.6.2",
-    "vite": "^6.0.3",
+    "sass-embedded": "^1.86.3",
+    "typescript": "~5.8.3",
+    "vite": "^6.3.2",
     "vite-plugin-svgr": "^4.3.0"
   }
 }

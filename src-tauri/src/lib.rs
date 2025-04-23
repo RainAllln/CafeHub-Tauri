@@ -1,26 +1,22 @@
-//User Model
-// untuk bisa passing data ke frontendnya
-
+use chrono::NaiveDate;
 use mysql::prelude::*;
 use mysql::{params, Pool};
+use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 use tauri::State;
 
 #[derive(Serialize, Deserialize, Clone)]
 
-pub struct User {
-    id: String,
+struct Account {
+    id: i64, // Use i64 for BIGINT
     username: String,
+    phone: Option<String>,        // Use Option for nullable fields
+    gender: Option<i8>,           // Use Option<i8> for nullable TINYINT
+    join_time: Option<NaiveDate>, // Use Option<NaiveDate> for nullable DATE
+    balance: Option<Decimal>,     // Use Option<Decimal> for nullable DECIMAL
+    user_type: i8,                // Use i8 for non-nullable TINYINT
 }
 
-pub struct CurrentUser {
-    // dispake untuk nyimpen state user yang lagi login (cookie bro
-    // mutex untuk nyimpen object lognya
-    user: Mutex<Option<User>>,
-}
-
-// struct buat misal connect ke mysql
 struct MySQLConfig {
     user: String,
     password: String,
@@ -28,8 +24,6 @@ struct MySQLConfig {
     database: String,
 }
 
-//struct function
-// kek jadi biar bisa implement
 impl MySQLConfig {
     fn new(user: String, password: String, host: String, database: String) -> Self {
         MySQLConfig {
@@ -40,7 +34,6 @@ impl MySQLConfig {
         }
     }
 
-    //refer ke self sendiri makanya pake &self
     fn format_url(&self) -> String {
         format!(
             "mysql://{}:{}@{}/{}",
@@ -49,62 +42,50 @@ impl MySQLConfig {
     }
 }
 
-// #[tauri::command]
-// fn login(
-//     username: &str,
-//     password: &str,
-//     mysql_pool: State<Pool>,
-//     current_user: State<CurrentUser>,
-// ) -> bool {
-//     // Get connection
-//     let mut conn: mysql::PooledConn = mysql_pool.get_conn().expect("Failed to get connection.");
-
-//     let result: Option<(String, String)> = conn
-//         .exec_first(
-//             "SELECT id, username FROM users WHERE username = :username AND password = :password",
-//             params! {
-//                 "username" => username,
-//                 "password" => password,
-//             },
-//         )
-//         .expect("Failed to execute query");
-
-//     if let Some((id, username)) = result {
-//         let user = User { id, username };
-//         // update current_user
-//         // lock sama unwrap punya mutex, replace() dari option
-//         // lock buat ngambil lock objectnya agar bisa diakses sama satu thread doang terus unwrap buat dapetin objectnya
-//         current_user.user.lock().unwrap().replace(user);
-
-//         return true;
-//     }
-//     false //return value
-// }
-
-// #[tauri::command]
-// fn get_current_user(current_user: State<CurrentUser>) -> Option<User> {
-//     //harus di clone supaya bisa di pake
-//     return current_user.user.lock().unwrap().clone();
-// }
-
 #[tauri::command]
-fn get_name_from_db(mysql_pool: State<Pool>) -> Result<String, String> {
-    let mut conn = mysql_pool.get_conn().map_err(|e| e.to_string())?;
-    let result: Result<Option<String>, String> = conn
-        .query_first("SELECT name FROM test WHERE id=1")
-        .map_err(|e| e.to_string());
+fn login(username: String, password: String, mysql_pool: State<Pool>) -> Result<Account, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+    let result: Result<Option<(i64, String, Option<String>, Option<i8>, Option<NaiveDate>, Option<Decimal>, i8)>, mysql::Error> = conn
+        .exec_first(
+            "SELECT id, username, phone, gender, join_time, balance, user_type FROM account WHERE username = :username AND password = :password",
+            params! {
+                "username" => &username, // Pass username by reference
+                "password" => &password, // Pass password by reference
+            },
+        );
 
     match result {
-        Ok(Some(name)) => Ok(name),
-        Ok(None) => Err("Name not found".to_string()),
-        Err(e) => Err(e),
+        Ok(Some((id, uname, phone, gender, join_time, balance, user_type))) => {
+            // User found, construct and return Account struct
+            let account = Account {
+                id,
+                username: uname, // Use the username returned from DB
+                phone,
+                gender,
+                join_time,
+                balance,
+                user_type,
+            };
+            println!("Login successful for user: {}", username); // Log success
+            Ok(account)
+        }
+        Ok(None) => {
+            // No user found with the given credentials
+            println!("Login failed for user: {}", username); // Log failure
+            Err("Invalid username or password".to_string())
+        }
+        Err(e) => {
+            // An error occurred during query execution
+            eprintln!("Database query failed for user {}: {}", username, e); // Log error to stderr
+            Err(format!("Database query failed: {}", e))
+        }
     }
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // how to main
-    //initial mysqlconfig value
     let mysql_config: MySQLConfig = MySQLConfig::new(
         "root".to_string(),
         "123456".to_string(),
@@ -112,24 +93,15 @@ pub fn run() {
         "cafehub".to_string(),
     );
     let mysql_url = mysql_config.format_url();
-    let pool = Pool::new(&*mysql_url).expect("Failed getting pool.");
-    // ini kayanya &* itu refer terus kek buat allocate memorynya kemana jadi di kali sama
-    // memorynya mysql_config
-    //
-
-    let current_user = CurrentUser {
-        user: Mutex::new(None),
-    };
+    let pool_options = mysql::OptsBuilder::from_opts(
+        mysql::Opts::from_url(&mysql_url).expect("Invalid database URL"),
+    );
+    let pool = Pool::new(pool_options).expect("Failed to create DB pool.");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(pool)
-        .manage(current_user)
-        .invoke_handler(tauri::generate_handler![
-            // login,
-            // get_current_user,
-            get_name_from_db
-        ])
+        .invoke_handler(tauri::generate_handler![login])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

@@ -1,18 +1,21 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core"; // <-- 修改这里
+import { invoke } from "@tauri-apps/api/core";
 import NavBar from "@/components/NavBar";
-import WebTitle from "@/icon/WebTitle";
 
 const HomePage = () => {
-  const [greeting, setGreeting] = useState("Click the button to fetch name");
+  const [loginResult, setLoginResult] = useState("Click the button to test login");
 
-  const fetchNameFromDb = async () => {
+  const testAdminLogin = async () => {
     try {
-      const name = await invoke<string>("get_name_from_db"); // 调用 Rust 后端命令
-      setGreeting(name); // 更新 greeting 为数据库返回的 name
+      const result = await invoke<string>("login", {
+        username: "admin",
+        password: "123456",
+      });
+      setLoginResult(`Login Result: ${result}`);
     } catch (error) {
-      console.error("Failed to fetch name from database:", error);
-      setGreeting("Error fetching name");
+      console.error("Login failed:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setLoginResult(`Login failed: ${errorMessage}`);
     }
   };
 
@@ -20,9 +23,8 @@ const HomePage = () => {
     <>
       <div className="flex flex-col h-screen">
         <NavBar />
-        <h1 className="font-bold underline">你好</h1>
-        <p>{greeting}</p>
-        <button onClick={fetchNameFromDb}>Fetch Name from DB</button>
+        <p>{loginResult}</p>
+        <button onClick={testAdminLogin}>Test Admin Login</button>
       </div>
     </>
   );

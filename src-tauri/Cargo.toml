@@ -12,18 +12,19 @@ edition = "2021"
 # to make the lib name unique and wouldn't conflict with the bin name.
 # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "cafehub_lib"
-crate-type = ["staticlib", "cdylib", "rlib"]
+crate-type = ["cdylib", "rlib", "staticlib"]
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
 cynic-codegen = { version = "3" }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-tauri-plugin-opener = "2"
+chrono = { version = "0.4", features = ["serde"] }
+cynic = { version = "3", features = ["http-surf"] }
+mysql = { version = "*", features = ["chrono", "rust_decimal"] }
+rust_decimal = { version = "1", features = ["serde-with-float"] } 
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-mysql = "26.0.0"
-cynic = { version = "3", features = ["http-surf"] }
 surf = "2"
-
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"

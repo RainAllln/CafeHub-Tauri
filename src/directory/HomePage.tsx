@@ -2,20 +2,30 @@ import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import NavBar from "@/components/NavBar";
 
+interface Account {
+  id: number;
+  username: string;
+  phone?: string | null;
+  gender?: number | null;
+  join_time?: string | null;
+  balance?: number | null;
+  user_type: number;
+}
+
 const HomePage = () => {
   const [loginResult, setLoginResult] = useState("Click the button to test login");
 
   const testAdminLogin = async () => {
     try {
-      const result = await invoke<string>("login", {
+      const account = await invoke<Account>("login", {
         username: "admin",
         password: "123456",
       });
-      setLoginResult(`Login Result: ${result}`);
+      setLoginResult(`Login Successful! Welcome, ${account.username}`);
+      console.log("Login successful, account data:", account);
     } catch (error) {
       console.error("Login failed:", error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      setLoginResult(`Login failed: ${errorMessage}`);
+      setLoginResult(`Login failed: ${error}`);
     }
   };
 

@@ -3,7 +3,7 @@ import WebTitle from '@/icon/WebTitle';
 import { ConfigProvider, Layout } from 'antd'
 import { Content } from 'antd/es/layout/layout';
 import Sider from 'antd/es/layout/Sider';
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Outlet, useNavigate } from 'react-router'
 /**
  * 左侧导航栏，中间部分设置各页面
@@ -12,8 +12,20 @@ import { Outlet, useNavigate } from 'react-router'
  */
 
 const LayoutPage = () => {
+  const navigate = useNavigate()
+
   const [collapsed, setCollapsed] = useState(false);
 
+  useEffect(
+    () => {
+      const isAuthenticated = localStorage.getItem('isAuthenticated');
+      if (!isAuthenticated) {
+        // 如果没有登录，跳转到登录页面
+        navigate('/login');
+      }
+    },
+    [navigate]
+  );
 
   return (
     <ConfigProvider

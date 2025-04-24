@@ -11,7 +11,7 @@ import { createBrowserRouter, Navigate } from 'react-router'
 const router = createBrowserRouter([
   {
     path: '/login',
-    element: <LoginPage /> // 默认路由，登录页面
+    element: <LoginPage /> // 登录页面
   },
   {
     path: '/',

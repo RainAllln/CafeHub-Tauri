@@ -10,35 +10,35 @@ const items: MenuItem[] = [
   {
     key: 'sub1',
     label: (
-      <Link to="/cost">消费</Link>
+      <Link to="/home/cost">消费</Link>
     ),
     icon: <TransactionOutlined />,
   },
   {
     key: 'sub2',
     label: (
-      <Link to="/member">会员</Link>
+      <Link to="/home/member">会员</Link>
     ),
     icon: <TeamOutlined />,
   },
   {
     key: 'sub3',
     label: (
-      <Link to="/lost">失物</Link>
+      <Link to="/home/lost">失物</Link>
     ),
     icon: <InboxOutlined />,
   },
   {
     key: 'sub4',
     label: (
-      <Link to="/product">商品</Link>
+      <Link to="/home/product">商品</Link>
     ),
     icon: <RestOutlined />,
   },
   {
     key: 'sub5',
     label: (
-      <Link to="/message">消息</Link>
+      <Link to="/home/message">消息</Link>
     ),
     icon: <MailOutlined />,
   },
@@ -48,6 +48,9 @@ const items: MenuItem[] = [
       <Link to="/login">退出</Link>
     ),
     icon: <LogoutOutlined />,
+    onClick: () => {
+      localStorage.removeItem('isAuthenticated'); // 清除登录状态
+    }
   }
 ];
 

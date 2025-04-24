@@ -1,10 +1,53 @@
 import { useNavigate } from "react-router-dom"
-import { Button, Image, Input, Tooltip } from "antd"
+import { Button, Image, Input, Tooltip, message } from "antd"
 import { EyeInvisibleOutlined, EyeTwoTone, InfoCircleOutlined, KeyOutlined, UserOutlined } from "@ant-design/icons"
 import bg from "@/assets/login.png"
+import { useState } from "react"
+import { login } from "@/api/user"
 
 const LoginPage = () => {
   const navigate = useNavigate()
+
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
+  const [messageApi, contextHolder] = message.useMessage();
+
+  const handleLogin = async () => {
+    try {
+      // 调用登录接口
+      await login(username, password);
+      if (localStorage.getItem('isAuthenticated') === 'true') {
+        // 登录成功，跳转到首页
+        navigate('/');
+        messageApi.open({
+          type: 'success',
+          content: '登录成功',
+          duration: 2,
+        });
+      } else {
+        console.log('登录失败');
+        messageApi.open({
+          type: 'error',
+          content: '账号或密码错误',
+          duration: 2,
+        });
+      }
+    } catch (error) {
+      console.error('登录接口调用失败', error);
+      messageApi.open({
+        type: 'error',
+        content: '登录失败，请稍后再试',
+        duration: 2,
+      });
+    }
+  }
+
+  const onChangeUsername = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsername(e.target.value)
+  }
+  const onChangePassword = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPassword(e.target.value)
+  }
 
   return (
     <div className="flex flex-row min-h-screen" style={{
@@ -26,6 +69,7 @@ const LoginPage = () => {
                 <InfoCircleOutlined style={{ color: 'rgba(0,0,0,.45)' }} />
               </Tooltip>
             }
+            onChange={onChangeUsername}
             className="my-4"
           />
           <Input.Password
@@ -33,9 +77,11 @@ const LoginPage = () => {
             prefix={<KeyOutlined style={{ color: 'rgba(0,0,0,.25)' }} />}
             iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
             className="my-4"
+            onChange={onChangePassword}
           />
+          {contextHolder}
           <div className="flex justify-between w-full mt-2">
-            <Button type="primary">登录</Button>
+            <Button type="primary" onClick={handleLogin}>登录</Button>
             <Button>注册</Button>
           </div>
         </div>

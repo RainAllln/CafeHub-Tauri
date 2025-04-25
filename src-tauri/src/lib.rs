@@ -1,20 +1,27 @@
-use chrono::NaiveDate;
+use chrono::{Local, NaiveDate}; // Import Local for current date
 use mysql::prelude::*;
-use mysql::{params, Pool};
+use mysql::{params, Error as MySQLError, Pool}; // Import MySQLError
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
 #[derive(Serialize, Deserialize, Clone)]
-
 struct Account {
-    id: i64, // Use i64 for BIGINT
+    id: i64,
     username: String,
-    phone: Option<String>,        // Use Option for nullable fields
-    gender: Option<i8>,           // Use Option<i8> for nullable TINYINT
-    join_time: Option<NaiveDate>, // Use Option<NaiveDate> for nullable DATE
-    balance: Option<Decimal>,     // Use Option<Decimal> for nullable DECIMAL
-    user_type: i8,                // Use i8 for non-nullable TINYINT
+    phone: Option<String>,
+    gender: Option<i8>,
+    join_time: Option<NaiveDate>,
+    balance: Option<Decimal>,
+    user_type: i8,
+}
+
+#[derive(Deserialize)]
+struct RegistrationData {
+    username: String,
+    password: String,
+    phone: Option<String>,
+    gender: Option<i8>, // Expect 0 (Male) or 1 (Female) or null
 }
 
 struct MySQLConfig {
@@ -51,17 +58,16 @@ fn login(username: String, password: String, mysql_pool: State<Pool>) -> Result<
         .exec_first(
             "SELECT id, username, phone, gender, join_time, balance, user_type FROM account WHERE username = :username AND password = :password",
             params! {
-                "username" => &username, // Pass username by reference
-                "password" => &password, // Pass password by reference
+                "username" => &username, 
+                "password" => &password, 
             },
         );
 
     match result {
         Ok(Some((id, uname, phone, gender, join_time, balance, user_type))) => {
-            // User found, construct and return Account struct
             let account = Account {
                 id,
-                username: uname, // Use the username returned from DB
+                username: uname,
                 phone,
                 gender,
                 join_time,
@@ -73,13 +79,68 @@ fn login(username: String, password: String, mysql_pool: State<Pool>) -> Result<
         }
         Ok(None) => {
             // No user found with the given credentials
-            println!("Login failed for user: {}", username); // Log failure
+            println!("Login failed for user: {}", username);
             Err("Invalid username or password".to_string())
         }
         Err(e) => {
             // An error occurred during query execution
-            eprintln!("Database query failed for user {}: {}", username, e); // Log error to stderr
+            eprintln!("Database query failed for user {}: {}", username, e);
             Err(format!("Database query failed: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<String, String> {
+    // Validate input (basic example)
+    if data.username.is_empty() || data.password.is_empty() {
+        return Err("Username and password cannot be empty".to_string());
+    }
+    if let Some(gender) = data.gender {
+        if gender != 0 && gender != 1 {
+            return Err("Invalid gender value. Use 0 for Male or 1 for Female.".to_string());
+        }
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    // Get current date for join_time
+    let current_date = Local::now().date_naive();
+    // Default user_type to Customer (1) for self-registration
+    let user_type: i8 = 1;
+    // Default balance
+    let default_balance: Decimal = Decimal::new(0, 2);
+    let result = conn.exec_drop(
+        "INSERT INTO account (username, password, phone, gender, join_time, balance, user_type) VALUES (:username, :password, :phone, :gender, :join_time, :balance, :user_type)",
+        params! {
+            "username" => &data.username,
+            "password" => &data.password, 
+            "phone" => &data.phone,
+            "gender" => &data.gender,
+            "join_time" => current_date,
+            "balance" => default_balance,
+            "user_type" => user_type,
+        },
+    );
+
+    match result {
+        Ok(_) => {
+            println!("Successfully registered user: {}", data.username);
+            Ok(format!("User '{}' registered successfully!", data.username))
+        }
+        Err(e) => {
+            eprintln!("Failed to register user {}: {}", data.username, e);
+            // Check for specific MySQL errors like duplicate entry
+            if let MySQLError::MySqlError(ref mysql_err) = e {
+                if mysql_err.code == 1062 {
+                    // Error code for duplicate entry
+                    return Err(format!("Username '{}' already exists.", data.username));
+                }
+            }
+            // Return a generic error for other database issues
+            Err(format!("Database error during registration: {}", e))
         }
     }
 }
@@ -101,7 +162,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .manage(pool)
-        .invoke_handler(tauri::generate_handler![login])
+        .invoke_handler(tauri::generate_handler![login, register_user])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

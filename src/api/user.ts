@@ -16,10 +16,9 @@ export const login = async (uname: string, pwd: string) => {
       username: uname,
       password: pwd,
     });
-    localStorage.setItem("isAuthenticated", "true");
-    localStorage.setItem("loginAccount", JSON.stringify(account));
+    return true;
   } catch (error) {
     console.error("Login failed:", error);
-    localStorage.setItem("isAuthenticated", "false");
+    return false;
   }
 };

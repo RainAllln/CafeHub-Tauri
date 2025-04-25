@@ -5,16 +5,21 @@ import LostPage from '@/directory/LostPage'
 import MemberPage from '@/directory/MemberPage'
 import MessagePage from '@/directory/MessagePage'
 import ProductPage from '@/directory/ProductPage'
+import RegisterPage from '@/directory/RegisterPage'
 import React from 'react'
 import { createBrowserRouter, Navigate } from 'react-router'
 
 const router = createBrowserRouter([
   {
-    path: '/login',
+    path: '/',
     element: <LoginPage /> // 登录页面
   },
   {
-    path: '/',
+    path: '/register',
+    element: <RegisterPage />
+  },
+  {
+    path: '/home',
     element: <LayoutPage />,
     children: [
       {
@@ -22,23 +27,23 @@ const router = createBrowserRouter([
         element: <CostPage />
       },
       {
-        path: '/cost',
+        path: '/home/cost',
         element: <CostPage />
       },
       {
-        path: '/member',
+        path: '/home/member',
         element: <MemberPage />
       },
       {
-        path: '/lost',
+        path: '/home/lost',
         element: <LostPage />
       },
       {
-        path: '/product',
+        path: '/home/product',
         element: <ProductPage />
       },
       {
-        path: '/message',
+        path: '/home/message',
         element: <MessagePage />
       }
     ],
@@ -50,10 +55,6 @@ const router = createBrowserRouter([
   //   ]
   // },
   // 默认跳转到 /login
-  {
-    path: '*',
-    element: <Navigate to="/login" replace />
-  }
 ])
 
 export default router

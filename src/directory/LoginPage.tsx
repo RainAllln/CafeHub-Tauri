@@ -15,10 +15,10 @@ const LoginPage = () => {
   const handleLogin = async () => {
     try {
       // 调用登录接口
-      await login(username, password);
-      if (localStorage.getItem('isAuthenticated') === 'true') {
+      let res = await login(username, password);
+      if (res) {
         // 登录成功，跳转到首页
-        navigate('/');
+        navigate('/home');
         messageApi.open({
           type: 'success',
           content: '登录成功',
@@ -62,10 +62,10 @@ const LoginPage = () => {
         <div className="flex flex-col items-center bg-opacity-90 p-8 rounded w-2/5">
           <div className="text-4xl font-bold " style={{ fontFamily: 'STCaiyun, 华文彩云' }} >欢迎来到萃豆馆</div>
           <Input
-            placeholder="Enter your username"
+            placeholder="用户名"
             prefix={<UserOutlined style={{ color: 'rgba(0,0,0,.25)' }} />}
             suffix={
-              <Tooltip title="请输入您的账号">
+              <Tooltip title="请输入您的用户名">
                 <InfoCircleOutlined style={{ color: 'rgba(0,0,0,.45)' }} />
               </Tooltip>
             }
@@ -73,7 +73,7 @@ const LoginPage = () => {
             className="my-4"
           />
           <Input.Password
-            placeholder="input password"
+            placeholder="密码"
             prefix={<KeyOutlined style={{ color: 'rgba(0,0,0,.25)' }} />}
             iconRender={(visible) => (visible ? <EyeTwoTone /> : <EyeInvisibleOutlined />)}
             className="my-4"
@@ -82,7 +82,7 @@ const LoginPage = () => {
           {contextHolder}
           <div className="flex justify-between w-full mt-2">
             <Button type="primary" onClick={handleLogin}>登录</Button>
-            <Button>注册</Button>
+            <Button onClick={() => navigate('/register')}>注册</Button>
           </div>
         </div>
       </div>

@@ -16,16 +16,16 @@ const LayoutPage = () => {
 
   const [collapsed, setCollapsed] = useState(false);
 
-  useEffect(
-    () => {
-      const isAuthenticated = localStorage.getItem('isAuthenticated');
-      if (!isAuthenticated) {
-        // 如果没有登录，跳转到登录页面
-        navigate('/login');
-      }
-    },
-    [navigate]
-  );
+  // useEffect(
+  //   () => {
+  //     const isAuthenticated = localStorage.getItem('isAuthenticated');
+  //     if (!isAuthenticated) {
+  //       // 如果没有登录，跳转到登录页面
+  //       navigate('/');
+  //     }
+  //   },
+  //   [navigate]
+  // );
 
   return (
     <ConfigProvider

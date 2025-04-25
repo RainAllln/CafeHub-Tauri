@@ -45,11 +45,12 @@ const items: MenuItem[] = [
   {
     key: 'sub6',
     label: (
-      <Link to="/login">退出</Link>
+      <Link to="/">退出</Link>
     ),
     icon: <LogoutOutlined />,
     onClick: () => {
       localStorage.removeItem('isAuthenticated'); // 清除登录状态
+      localStorage.removeItem('loginAccount'); // 清除登录状态
     }
   }
 ];

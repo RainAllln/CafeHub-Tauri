@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import bg from "@/assets/login.png"
-import { Button, Input, Select, Tooltip } from 'antd'
+import { Button, Input, message, Select, Tooltip } from 'antd'
 import { EyeInvisibleOutlined, EyeTwoTone, InfoCircleOutlined, KeyOutlined, PhoneOutlined, UserOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
+import { register } from '@/api/user'
 
 const RegisterPage = () => {
   const navigate = useNavigate()
@@ -12,6 +13,7 @@ const RegisterPage = () => {
   const [phone, setPhone] = useState('')
   const [gendedr, setGendedr] = useState(0)
   const [phoneStatus, setPhoneStatus] = useState(true)
+  const [messageApi, contextHolder] = message.useMessage();
 
   const onChangeUsername = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUsername(e.target.value)
@@ -24,6 +26,36 @@ const RegisterPage = () => {
   }
   const onChangeGender = (value: number) => {
     setGendedr(value)
+  }
+
+  const handleRegister = async () => {
+    try {
+      // 调用登录接口
+      let res = await register(username, password, phone, gendedr);
+      if (res) {
+        // 登录成功，跳转到首页
+        navigate('/home');
+        messageApi.open({
+          type: 'success',
+          content: '注册成功',
+          duration: 2,
+        });
+      } else {
+        console.log('注册失败');
+        messageApi.open({
+          type: 'error',
+          content: '注册失败',
+          duration: 2,
+        });
+      }
+    } catch (error) {
+      console.error('注册接口调用失败', error);
+      messageApi.open({
+        type: 'error',
+        content: '注册失败，请稍后再试',
+        duration: 2,
+      });
+    }
   }
 
   useEffect(() => {
@@ -91,7 +123,7 @@ const RegisterPage = () => {
           </div>
           <div className='w-full flex my-4 justify-between'>
             <Button type="link" onClick={() => navigate('/')}>返回登录</Button>
-            <Button type="primary">注册</Button>
+            <Button type="primary" onClick={handleRegister}>注册</Button>
           </div>
         </div>
       </div>

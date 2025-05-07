@@ -1,8 +1,8 @@
-use chrono::{Local, NaiveDate, Datelike, Duration}; 
-use mysql::prelude::*; 
-use mysql::{params, Error as MySQLError, Pool, OptsBuilder, Opts, prelude::Queryable}; 
+use chrono::{Datelike, Duration, Local, NaiveDate};
+use mysql::prelude::*;
+use mysql::{params, prelude::Queryable, Error as MySQLError, Opts, OptsBuilder, Pool};
+use rust_decimal::prelude::FromStr;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::FromStr; 
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -13,7 +13,7 @@ struct Account {
     username: String,
     phone: Option<String>,
     gender: Option<i8>,
-    join_time: Option<NaiveDate>, 
+    join_time: Option<NaiveDate>,
     balance: Option<Decimal>,
     user_type: i8,
 }
@@ -23,7 +23,7 @@ struct RegistrationData {
     username: String,
     password: String,
     phone: Option<String>,
-    gender: Option<i8>, 
+    gender: Option<i8>,
 }
 
 struct MySQLConfig {
@@ -35,94 +35,185 @@ struct MySQLConfig {
 
 impl MySQLConfig {
     fn new(user: String, password: String, host: String, database: String) -> Self {
-        MySQLConfig { user, password, host, database }
+        MySQLConfig {
+            user,
+            password,
+            host,
+            database,
+        }
     }
     fn format_url(&self) -> String {
-        format!("mysql://{}:{}@{}/{}", self.user, self.password, self.host, self.database)
+        format!(
+            "mysql://{}:{}@{}/{}",
+            self.user, self.password, self.host, self.database
+        )
     }
 }
 
 #[derive(Serialize, Clone)]
 struct MonthlyConsumption {
-    month: String, 
+    month: String,
     total: Decimal,
 }
 
 #[derive(Serialize, Clone)]
 struct ConsumptionSummary {
-    join_date: Option<NaiveDate>,         
-    current_balance: Option<Decimal>,       
-    total_consumption: Option<Decimal>,     
-    latest_spending: Option<Decimal>,       
-    yearly_consumption_trend: Vec<MonthlyConsumption>, 
+    join_date: Option<NaiveDate>,
+    current_balance: Option<Decimal>,
+    total_consumption: Option<Decimal>,
+    latest_spending: Option<Decimal>,
+    yearly_consumption_trend: Vec<MonthlyConsumption>,
 }
 
 // --- 新增用于营收统计的 struct ---
-#[derive(Serialize, Clone, Default)] 
+#[derive(Serialize, Clone, Default)]
 struct RevenueSummary {
-    total_members: u64, // 会员总数
+    total_members: u64,          // 会员总数
     new_members_this_month: u64, // 本月新增会员
 }
 
 #[derive(Serialize, Clone)]
-struct ProductSales { // 用于后续商品销售分布
-    name: String,               // 商品名称
-    total_amount: Decimal,      // 商品总销售额
+struct ProductSales {
+    // 用于后续商品销售分布
+    name: String,          // 商品名称
+    total_amount: Decimal, // 商品总销售额
 }
 
 #[derive(Serialize, Clone)]
-struct MonthlyIncome { // 用于后续年度收入趋势
-    month: String, 
+struct MonthlyIncome {
+    // 用于后续年度收入趋势
+    month: String,
     income: Decimal,
 }
-
 
 // --- command 函数 ---
 #[tauri::command]
 fn login(username: String, password: String, mysql_pool: State<Pool>) -> Result<Account, String> {
-    let mut conn = mysql_pool.get_conn().map_err(|e| format!("Failed to get DB connection: {}", e))?;
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
     let result: Result<Option<(i64, String, Option<String>, Option<i8>, Option<NaiveDate>, Option<Decimal>, i8)>, mysql::Error> = conn.exec_first("SELECT id, username, phone, gender, join_time, balance, user_type FROM account WHERE username = :username AND password = :password", params! {"username" => &username, "password" => &password,});
     match result {
         Ok(Some((id, uname, phone, gender, join_time, balance, user_type))) => {
-            let account = Account { id, username: uname, phone, gender, join_time, balance, user_type };
-            println!("Login successful for user: {}", username); 
+            let account = Account {
+                id,
+                username: uname,
+                phone,
+                gender,
+                join_time,
+                balance,
+                user_type,
+            };
+            println!("Login successful for user: {}", username);
             Ok(account)
         }
-        Ok(None) => { println!("Login failed for user: {}", username); Err("Invalid username or password".to_string()) }
-        Err(e) => { eprintln!("Database query failed for user {}: {}", username, e); Err(format!("Database query failed: {}", e)) }
+        Ok(None) => {
+            println!("Login failed for user: {}", username);
+            Err("Invalid username or password".to_string())
+        }
+        Err(e) => {
+            eprintln!("Database query failed for user {}: {}", username, e);
+            Err(format!("Database query failed: {}", e))
+        }
     }
 }
 
 #[tauri::command]
-fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<String, String> {
-    if data.username.is_empty() || data.password.is_empty() { return Err("Username and password cannot be empty".to_string()); }
-    if let Some(gender) = data.gender { if gender != 0 && gender != 1 { return Err("Invalid gender value. Use 0 for Male or 1 for Female.".to_string()); } }
-    let mut conn = mysql_pool.get_conn().map_err(|e| format!("Failed to get DB connection: {}", e))?;
+fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<i32, String> {
+    // Validate username and password are not empty
+    if data.username.is_empty() || data.password.is_empty() {
+        return Err("Username and password cannot be empty".to_string());
+    }
+
+    // Validate gender: 4代表性别不是0或1
+    if let Some(gender_val) = data.gender {
+        if gender_val != 0 && gender_val != 1 {
+            return Ok(4);
+        }
+    }
+
+    // Validate phone: 3代表手机号并非11位 (and must be all digits)
+    if let Some(ref phone_str) = data.phone {
+        // Check if phone_str is not composed of 11 digits.
+        // This means either it contains non-digit characters or its length is not 11.
+        if !phone_str.chars().all(|c| c.is_ascii_digit()) || phone_str.len() != 11 {
+            return Ok(3);
+        }
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
     let current_date = Local::now().date_naive();
-    let user_type: i8 = 1;
-    let default_balance: Decimal = Decimal::new(0, 2);
-    let result = conn.exec_drop("INSERT INTO account (username, password, phone, gender, join_time, balance, user_type) VALUES (:username, :password, :phone, :gender, :join_time, :balance, :user_type)", params! {"username" => &data.username, "password" => &data.password, "phone" => &data.phone, "gender" => &data.gender, "join_time" => current_date, "balance" => default_balance, "user_type" => user_type,});
+    let user_type: i8 = 1; // Default user_type, assuming 1 for regular members
+    let default_balance: Decimal = Decimal::new(0, 2); // Default balance
+
+    let result = conn.exec_drop(
+        "INSERT INTO account (username, password, phone, gender, join_time, balance, user_type) VALUES (:username, :password, :phone, :gender, :join_time, :balance, :user_type)",
+        params! {
+            "username" => &data.username,
+            "password" => &data.password, // Note: Storing passwords in plain text is a security risk. Consider hashing.
+            "phone" => &data.phone,
+            "gender" => &data.gender,
+            "join_time" => current_date,
+            "balance" => default_balance,
+            "user_type" => user_type,
+        }
+    );
+
     match result {
-        Ok(_) => { println!("Successfully registered user: {}", data.username); Ok(format!("User '{}' registered successfully!", data.username)) }
+        Ok(_) => {
+            println!("Successfully registered user: {}", data.username);
+            Ok(1) // 1代表成功
+        }
         Err(e) => {
-            eprintln!("Failed to register user {}: {}", data.username, e);
-            if let MySQLError::MySqlError(ref mysql_err) = e { if mysql_err.code == 1062 { return Err(format!("Username '{}' already exists.", data.username)); } }
+            eprintln!("Database insert failed for user {}: {}", data.username, e); // Log the raw error
+            if let MySQLError::MySqlError(ref mysql_err) = e {
+                if mysql_err.code == 1062 {
+                    // MySQL error code for duplicate entry
+                    return Ok(2); // 2代表用户重复
+                }
+            }
+            // For other database errors, return a generic error string
             Err(format!("Database error during registration: {}", e))
         }
     }
 }
 
 #[tauri::command]
-async fn get_consumption_summary(account_id: i64, mysql_pool: State<'_, Pool>) -> Result<ConsumptionSummary, String> {
+async fn get_consumption_summary(
+    account_id: i64,
+    mysql_pool: State<'_, Pool>,
+) -> Result<ConsumptionSummary, String> {
     let mut conn = mysql_pool.get_conn().map_err(|e| e.to_string())?;
-    let account_info: Option<(Option<NaiveDate>, Option<Decimal>)> = conn.exec_first("SELECT join_time, balance FROM account WHERE id = :account_id", params! { "account_id" => account_id }).map_err(|e| e.to_string())?;
-    let (join_date, current_balance) = match account_info { Some((jd, bal)) => (jd, bal), None => (None, None), };
+    let account_info: Option<(Option<NaiveDate>, Option<Decimal>)> = conn
+        .exec_first(
+            "SELECT join_time, balance FROM account WHERE id = :account_id",
+            params! { "account_id" => account_id },
+        )
+        .map_err(|e| e.to_string())?;
+    let (join_date, current_balance) = match account_info {
+        Some((jd, bal)) => (jd, bal),
+        None => (None, None),
+    };
     let total_consumption: Option<Decimal> = conn.exec_first("SELECT COALESCE(SUM(amount), 0.00) FROM transactions WHERE account_id = :account_id AND transaction_type = 'purchase'", params! { "account_id" => account_id }).map_err(|e| e.to_string())?.map(|(sum,)| sum);
     let latest_spending: Option<Decimal> = conn.exec_first("SELECT amount FROM transactions WHERE account_id = :account_id AND transaction_type = 'purchase' ORDER BY transaction_time DESC LIMIT 1", params! { "account_id" => account_id }).map_err(|e| e.to_string())?.map(|(amount,)| amount);
     let one_year_ago = (Local::now() - Duration::days(365)).date_naive();
     let yearly_trend_raw: Vec<(String, String)> = conn.exec(r"SELECT DATE_FORMAT(transaction_time, '%Y-%m') AS month, CAST(COALESCE(SUM(amount), 0.00) AS CHAR) AS monthly_total FROM transactions WHERE account_id = :account_id AND transaction_type = 'purchase' AND transaction_time >= :one_year_ago GROUP BY month ORDER BY month ASC", params! { "account_id" => account_id, "one_year_ago" => one_year_ago }).map_err(|e| e.to_string())?;
-    let yearly_consumption_trend: Vec<MonthlyConsumption> = yearly_trend_raw.into_iter().map(|(month, total_str)| { MonthlyConsumption { month, total: Decimal::from_str(&total_str).unwrap_or_else(|_| Decimal::new(0, 2)), } }).collect();
-    Ok(ConsumptionSummary { join_date, current_balance, total_consumption, latest_spending, yearly_consumption_trend })
+    let yearly_consumption_trend: Vec<MonthlyConsumption> = yearly_trend_raw
+        .into_iter()
+        .map(|(month, total_str)| MonthlyConsumption {
+            month,
+            total: Decimal::from_str(&total_str).unwrap_or_else(|_| Decimal::new(0, 2)),
+        })
+        .collect();
+    Ok(ConsumptionSummary {
+        join_date,
+        current_balance,
+        total_consumption,
+        latest_spending,
+        yearly_consumption_trend,
+    })
 }
 
 // --- 获取收入get_revenue_summary command 函数 ---
@@ -131,16 +222,16 @@ async fn get_revenue_summary(mysql_pool: State<'_, Pool>) -> Result<RevenueSumma
     let mut conn = mysql_pool.get_conn().map_err(|e| e.to_string())?;
 
     // 查询会员总数 (假设 user_type = 1 代表客户/会员)
-    let total_members: u64 = conn.query_first(
-        "SELECT COUNT(*) FROM account WHERE user_type = 1"
-    ).map_err(|e| e.to_string())? 
-     .unwrap_or(0); 
+    let total_members: u64 = conn
+        .query_first("SELECT COUNT(*) FROM account WHERE user_type = 1")
+        .map_err(|e| e.to_string())?
+        .unwrap_or(0);
 
     // 查询本月新增会员数量 (从本月第一天开始计算)
     let new_members_this_month: u64 = conn.query_first(
         "SELECT COUNT(*) FROM account WHERE user_type = 1 AND join_time >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"
     ).map_err(|e| e.to_string())?
-     .unwrap_or(0); 
+     .unwrap_or(0);
 
     // 构建并返回结果
     Ok(RevenueSummary {
@@ -151,7 +242,9 @@ async fn get_revenue_summary(mysql_pool: State<'_, Pool>) -> Result<RevenueSumma
 
 // --- 获取商品销售额get_product_sales_distribution----
 #[tauri::command]
-async fn get_product_sales_distribution(mysql_pool: State<'_, Pool>) -> Result<Vec<ProductSales>, String> {
+async fn get_product_sales_distribution(
+    mysql_pool: State<'_, Pool>,
+) -> Result<Vec<ProductSales>, String> {
     let mut conn = mysql_pool.get_conn().map_err(|e| e.to_string())?;
 
     // SQL 查询：
@@ -173,17 +266,14 @@ async fn get_product_sales_distribution(mysql_pool: State<'_, Pool>) -> Result<V
     ";
 
     // 执行查询，期望返回 (商品名字符串, 总金额字符串) 的元组列表
-    let result_data: Vec<(String, String)> = conn.query(query)
-        .map_err(|e| e.to_string())?; // 处理查询错误
+    let result_data: Vec<(String, String)> = conn.query(query).map_err(|e| e.to_string())?; // 处理查询错误
 
     // 将查询结果映射到 ProductSales 结构体列表
     let product_sales_list: Result<Vec<ProductSales>, _> = result_data
         .into_iter()
         .map(|(name, amount_str)| {
             // 将金额字符串解析回 Decimal 类型
-            Decimal::from_str(&amount_str).map(|total_amount| {
-                ProductSales { name, total_amount }
-            })
+            Decimal::from_str(&amount_str).map(|total_amount| ProductSales { name, total_amount })
         })
         .collect(); // collect 会将 Vec<Result<T, E>> 转换成 Result<Vec<T>, E>
 
@@ -191,10 +281,11 @@ async fn get_product_sales_distribution(mysql_pool: State<'_, Pool>) -> Result<V
     product_sales_list.map_err(|e| format!("Failed to parse decimal amount: {}", e))
 }
 
-
 // 获取年收入
 #[tauri::command]
-async fn get_yearly_income_trend(mysql_pool: State<'_, Pool>) -> Result<Vec<MonthlyIncome>, String> {
+async fn get_yearly_income_trend(
+    mysql_pool: State<'_, Pool>,
+) -> Result<Vec<MonthlyIncome>, String> {
     let mut conn = mysql_pool.get_conn().map_err(|e| e.to_string())?;
 
     let one_year_ago_date = (Local::now() - Duration::days(365)).date_naive();
@@ -217,19 +308,16 @@ async fn get_yearly_income_trend(mysql_pool: State<'_, Pool>) -> Result<Vec<Mont
     ";
 
     // 执行查询，期望返回 (月份字符串, 月收入字符串) 的元组列表
-    let result_data: Vec<(String, String)> = conn.exec(
-        query,
-        params! { "one_year_ago" => one_year_ago_date }
-    ).map_err(|e| e.to_string())?;
+    let result_data: Vec<(String, String)> = conn
+        .exec(query, params! { "one_year_ago" => one_year_ago_date })
+        .map_err(|e| e.to_string())?;
 
     // 将查询结果映射到 MonthlyIncome 结构体列表
     let monthly_income_list: Result<Vec<MonthlyIncome>, _> = result_data
         .into_iter()
         .map(|(month, income_str)| {
             // 将金额字符串解析回 Decimal 类型
-            Decimal::from_str(&income_str).map(|income| {
-                MonthlyIncome { month, income }
-            })
+            Decimal::from_str(&income_str).map(|income| MonthlyIncome { month, income })
         })
         .collect(); // collect 会将 Vec<Result<T, E>> 转换成 Result<Vec<T>, E>
 
@@ -238,30 +326,28 @@ async fn get_yearly_income_trend(mysql_pool: State<'_, Pool>) -> Result<Vec<Mont
 }
 // 获取年收入结束
 
-
 // --- run 函数 ---
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mysql_config: MySQLConfig = MySQLConfig::new(
-        "root".to_string(),             
-        "123456".to_string(),           
-        "localhost".to_string(),        
-        "cafehub".to_string(),         
+        "root".to_string(),
+        "123456".to_string(),
+        "localhost".to_string(),
+        "cafehub".to_string(),
     );
-    
+
     let mysql_url = mysql_config.format_url();
-    let pool_options = OptsBuilder::from_opts( 
-        Opts::from_url(&mysql_url).expect("Invalid database URL"),
-    );
-    let pool = Pool::new(pool_options).expect("Failed to create DB pool."); 
+    let pool_options =
+        OptsBuilder::from_opts(Opts::from_url(&mysql_url).expect("Invalid database URL"));
+    let pool = Pool::new(pool_options).expect("Failed to create DB pool.");
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .manage(pool) 
+        .manage(pool)
         // --- 修改：添加了 get_revenue_summary ---
         .invoke_handler(tauri::generate_handler![
-            login, 
-            register_user, 
+            login,
+            register_user,
             get_consumption_summary,
             get_revenue_summary,
             get_product_sales_distribution,

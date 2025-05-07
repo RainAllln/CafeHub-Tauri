@@ -1,49 +1,56 @@
-import React, { useState } from 'react';
-import { AppstoreOutlined, DollarOutlined, InboxOutlined, LogoutOutlined, MailOutlined, RestOutlined, SettingOutlined, TeamOutlined, TransactionOutlined } from '@ant-design/icons';
+import React from 'react'; 
+import { TransactionOutlined, TeamOutlined, InboxOutlined, RestOutlined, MailOutlined, BarChartOutlined, LogoutOutlined } from '@ant-design/icons'; 
 import type { MenuProps } from 'antd';
 import { Menu } from 'antd';
-import { Link } from 'react-router';
+import { Link } from 'react-router-dom'; 
 
 type MenuItem = Required<MenuProps>['items'][number];
 
 const items: MenuItem[] = [
   {
-    key: 'sub1',
+    key: '/home/consumption', // 使用路径作为 key
     label: (
-      <Link to="/home/cost">消费</Link>
+      <Link to="/home/consumption">消费概览</Link> 
     ),
     icon: <TransactionOutlined />,
   },
   {
-    key: 'sub2',
+    key: '/home/member',
     label: (
       <Link to="/home/member">会员</Link>
     ),
     icon: <TeamOutlined />,
   },
   {
-    key: 'sub3',
+    key: '/home/lost',
     label: (
       <Link to="/home/lost">失物</Link>
     ),
     icon: <InboxOutlined />,
   },
   {
-    key: 'sub4',
+    key: '/home/product',
     label: (
       <Link to="/home/product">商品</Link>
     ),
     icon: <RestOutlined />,
   },
   {
-    key: 'sub5',
+    key: '/home/message',
     label: (
       <Link to="/home/message">消息</Link>
     ),
     icon: <MailOutlined />,
   },
+  { // 新增的营收情况菜单项
+    key: '/home/revenue',             
+    label: (
+      <Link to="/home/revenue">营收情况</Link> 
+    ),
+    icon: <BarChartOutlined />,      
+  },
   {
-    key: 'sub6',
+    key: 'logout', 
     label: (
       <Link to="/">退出</Link>
     ),
@@ -56,20 +63,14 @@ const items: MenuItem[] = [
 ];
 
 const NavBar: React.FC = () => {
-  const onClick: MenuProps['onClick'] = (e) => {
-    console.log('click ', e);
-  };
 
   return (
     <Menu
-      onClick={onClick}
-      defaultSelectedKeys={['sub1']}
-      defaultOpenKeys={['sub1']}
       mode="inline"
       items={items}
       style={{
-        background: 'transparent', // 背景透明，与侧边栏渐变色融合
-        color: '#ffffff', // 默认文字颜色
+        background: 'transparent', 
+        color: '#ffffff', 
       }}
     />
   );

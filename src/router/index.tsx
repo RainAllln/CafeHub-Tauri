@@ -1,13 +1,16 @@
-import CostPage from '@/directory/CostPage'
-import LayoutPage from '@/directory/LayoutPage'
-import LoginPage from '@/directory/LoginPage'
-import LostPage from '@/directory/LostPage'
+import CostPage from '@/directory/CostPage' 
+import LayoutPage from '@/directory/LayoutPage' // 主布局
+import LoginPage from '@/directory/LoginPage' // 登录页
+import LostPage from '@/directory/LostPage' 
 import MemberPage from '@/directory/MemberPage'
 import MessagePage from '@/directory/MessagePage'
 import ProductPage from '@/directory/ProductPage'
-import RegisterPage from '@/directory/RegisterPage'
-import React from 'react'
-import { createBrowserRouter, Navigate } from 'react-router'
+import RegisterPage from '@/directory/RegisterPage' // 注册页
+import ConsumptionPage from '@/directory/ConsumptionPage'; //消费页面
+import React from 'react' 
+import { createBrowserRouter, Navigate } from 'react-router' 
+import RevenuePage from '@/directory/RevenuePage';
+
 
 const router = createBrowserRouter([
   {
@@ -20,15 +23,12 @@ const router = createBrowserRouter([
   },
   {
     path: '/home',
-    element: <LayoutPage />,
+    element: <LayoutPage />, // 主布局，包含侧边栏
     children: [
+      // --- 修改/添加子路由 ---
       {
-        index: true,
-        element: <CostPage />
-      },
-      {
-        path: '/home/cost',
-        element: <CostPage />
+        path: '/home/cost', // 这个路径指向 CostPage，
+        element: <CostPage /> 
       },
       {
         path: '/home/member',
@@ -45,16 +45,19 @@ const router = createBrowserRouter([
       {
         path: '/home/message',
         element: <MessagePage />
-      }
+      },
+    
+      {
+        path: '/home/consumption', // 消费页面的路径
+        element: <ConsumptionPage />, 
+      },
+     
+      {
+        path: '/home/revenue', // 营收情况页面路径
+        element: <RevenuePage />, 
+      },
     ],
   },
-  // {
-  //   path: '/',
-  //   element: <Window />, // 默认路由，登录页面
-  //   children: [
-  //   ]
-  // },
-  // 默认跳转到 /login
 ])
 
 export default router

@@ -25,7 +25,7 @@ export const login = async (uname: string, pwd: string) => {
 
 export const register = async (uname: string, pwd: string, phe: string, gen: number) => {
   try {
-    await invoke("register_user", {
+    let res = await invoke("register_user", {
       data: {
         username: uname,
         password: pwd,
@@ -33,7 +33,7 @@ export const register = async (uname: string, pwd: string, phe: string, gen: num
         gender: gen, // Or pass actual gender if available (0 for Male, 1 for Female)
       },
     });
-    return true;
+    return res;
   } catch (error) {
     console.error("register failed:", error);
     return false;

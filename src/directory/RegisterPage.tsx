@@ -32,7 +32,7 @@ const RegisterPage = () => {
     try {
       // 调用登录接口
       let res = await register(username, password, phone, gendedr);
-      if (res) {
+      if (res == 1) {
         // 登录成功，跳转到首页
         navigate('/home');
         messageApi.open({
@@ -40,11 +40,25 @@ const RegisterPage = () => {
           content: '注册成功',
           duration: 2,
         });
-      } else {
-        console.log('注册失败');
+      } else if (res == 2) {
+        console.log('用户重复');
         messageApi.open({
           type: 'error',
-          content: '注册失败',
+          content: '注册失败，用户名已存在',
+          duration: 2,
+        });
+      } else if (res == 3) {
+        console.log('手机号不是11位');
+        messageApi.open({
+          type: 'error',
+          content: '注册失败，手机号不是11位',
+          duration: 2,
+        });
+      } else if (res == 4) {
+        console.log('性别设置错误');
+        messageApi.open({
+          type: 'error',
+          content: '注册失败，性别设置错误',
           duration: 2,
         });
       }
@@ -114,14 +128,15 @@ const RegisterPage = () => {
             <Select
               onChange={onChangeGender}
               options={[
-                { value: 1, label: '男' },
-                { value: 2, label: '女' }
+                { value: 0, label: '男' },
+                { value: 1, label: '女' }
               ]}
               className='w-full'
               placeholder="性别"
             />
           </div>
           <div className='w-full flex my-4 justify-between'>
+            {contextHolder}
             <Button type="link" onClick={() => navigate('/')}>返回登录</Button>
             <Button type="primary" onClick={handleRegister}>注册</Button>
           </div>

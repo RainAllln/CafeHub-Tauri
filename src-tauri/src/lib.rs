@@ -1,11 +1,9 @@
 use chrono::{Datelike, Local, NaiveDate};
-use mysql::prelude::*;
 use mysql::{params, prelude::Queryable, Error as MySQLError, Opts, OptsBuilder, Pool};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-// --- struct 定义 ---
 #[derive(Serialize, Deserialize, Clone)]
 struct Account {
     id: i64,
@@ -47,6 +45,79 @@ struct UpdateUserData {
 struct UpdatePasswordData {
     current_password: String,
     new_password: String,
+}
+
+#[derive(Deserialize)]
+struct AddGoodsData {
+    goods_name: String,
+    goods_type: Option<String>,
+    price: Decimal,
+    stock: Option<i32>,
+}
+
+#[derive(Deserialize)]
+struct UpdateGoodsStockData {
+    stock: i32,
+}
+
+#[derive(Deserialize)]
+struct PurchaseGoodsData {
+    user_id: i64,
+    goods_id: i32,
+    quantity: i32,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct LostItem {
+    id: i64,
+    item_name: String,
+    pick_place: Option<String>,
+    pick_user_id: Option<i64>,
+    claim_user_id: Option<i64>,
+    pick_time: Option<NaiveDate>,
+    claim_time: Option<NaiveDate>,
+    status: i8, // 0: Unclaimed, 1: Claimed
+}
+
+#[derive(Deserialize)]
+struct ReportLostItemData {
+    item_name: String,
+    pick_place: Option<String>,
+    pick_user_id: Option<i64>,
+}
+
+#[derive(Deserialize)]
+struct ClaimLostItemData {
+    item_id: i64,
+    claim_user_id: i64,
+}
+
+#[derive(Deserialize)]
+struct SendMessageData {
+    sender_id: i64,
+    receiver_id: i64,
+    title: Option<String>,
+    message_content: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct MessageInfo {
+    id: i64,
+    sender_id: i64,
+    receiver_id: i64,
+    sender_username: String,
+    receiver_username: String,
+    title: Option<String>,
+    message_content: String,
+    send_date: Option<NaiveDate>,
+    read_status: i8, // 0: Unread, 1: Read
+    is_sender: bool, // True if the current user is the sender of this message
+}
+
+#[derive(Deserialize)]
+struct MarkReadData {
+    message_id: i64,
+    // The user_id of the one marking it read will be passed to the function
 }
 
 struct MySQLConfig {
@@ -111,14 +182,14 @@ fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<i32,
         return Err("Username and password cannot be empty".to_string());
     }
 
-    // Validate gender: 4代表性别不是0或1
+    // Validate gender: 4 means gender is not 0 or 1
     if let Some(gender_val) = data.gender {
         if gender_val != 0 && gender_val != 1 {
             return Ok(4);
         }
     }
 
-    // Validate phone: 3代表手机号并非11位 (and must be all digits)
+    // Validate phone: 3 means the phone number is not 11 digits (and must be all digits)
     if let Some(ref phone_str) = data.phone {
         // Check if phone_str is not composed of 11 digits.
         // This means either it contains non-digit characters or its length is not 11.
@@ -150,14 +221,14 @@ fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<i32,
     match result {
         Ok(_) => {
             println!("Successfully registered user: {}", data.username);
-            Ok(1) // 1代表成功
+            Ok(1) // 1 means success
         }
         Err(e) => {
             eprintln!("Database insert failed for user {}: {}", data.username, e); // Log the raw error
             if let MySQLError::MySqlError(ref mysql_err) = e {
                 if mysql_err.code == 1062 {
                     // MySQL error code for duplicate entry
-                    return Ok(2); // 2代表用户重复
+                    return Ok(2); // 2 means duplicate user
                 }
             }
             // For other database errors, return a generic error string
@@ -466,6 +537,520 @@ fn update_user_password(
     }
 }
 
+#[tauri::command]
+fn add_goods(data: AddGoodsData, mysql_pool: State<Pool>) -> Result<String, String> {
+    if data.goods_name.is_empty() {
+        return Err("Goods name cannot be empty".to_string());
+    }
+    if data.price <= Decimal::ZERO {
+        return Err("Price must be positive".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let stock_value = data.stock.unwrap_or(0); // Default to 0 if not provided
+
+    let result = conn.exec_drop(
+        "INSERT INTO goods (goods_name, goods_type, price, stock) VALUES (:goods_name, :goods_type, :price, :stock)",
+        params! {
+            "goods_name" => &data.goods_name,
+            "goods_type" => &data.goods_type,
+            "price" => data.price,
+            "stock" => stock_value,
+        }
+    );
+
+    match result {
+        Ok(_) => {
+            println!("Successfully added goods: {}", data.goods_name);
+            Ok(format!("Goods '{}' added successfully.", data.goods_name))
+        }
+        Err(e) => {
+            eprintln!(
+                "Database insert failed for goods {}: {}",
+                data.goods_name, e
+            );
+            if let MySQLError::MySqlError(ref mysql_err) = e {
+                if mysql_err.code == 1062 {
+                    // Duplicate entry for unique key (e.g. goods_name if unique)
+                    return Err(format!(
+                        "Goods with name '{}' already exists.",
+                        data.goods_name
+                    ));
+                }
+            }
+            Err(format!("Database error while adding goods: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn update_goods_stock(
+    goods_id: i32,
+    data: UpdateGoodsStockData,
+    mysql_pool: State<Pool>,
+) -> Result<String, String> {
+    if data.stock < 0 {
+        return Err("Stock cannot be negative".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let result = conn.exec_drop(
+        "UPDATE goods SET stock = :stock WHERE id = :goods_id",
+        params! {
+            "stock" => data.stock,
+            "goods_id" => goods_id,
+        },
+    );
+
+    match result {
+        Ok(_) => {
+            if conn.affected_rows() > 0 {
+                println!("Successfully updated stock for goods ID: {}", goods_id);
+                Ok(format!(
+                    "Stock for goods ID {} updated successfully.",
+                    goods_id
+                ))
+            } else {
+                Err(format!(
+                    "Goods with ID {} not found or stock was already the same.",
+                    goods_id
+                ))
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Database update failed for goods stock (ID {}): {}",
+                goods_id, e
+            );
+            Err(format!("Database error while updating stock: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<String, String> {
+    if data.quantity <= 0 {
+        return Err("Quantity must be positive".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    // Start a transaction
+    let mut tx = conn
+        .start_transaction(mysql::TxOpts::default())
+        .map_err(|e| format!("Failed to start transaction: {}", e))?;
+
+    // 1. Check goods information and stock, and lock the row
+    let goods_info: Option<(Decimal, i32)> = tx
+        .exec_first(
+            "SELECT price, stock FROM goods WHERE id = :goods_id FOR UPDATE",
+            params! { "goods_id" => data.goods_id },
+        )
+        .map_err(|e| format!("Failed to query goods: {}", e))?;
+
+    let (price_per_item, current_stock) = match goods_info {
+        Some(info) => info,
+        None => {
+            // tx will be rolled back automatically (because it was not committed)
+            return Err(format!("Goods with ID {} not found.", data.goods_id));
+        }
+    };
+
+    if current_stock < data.quantity {
+        return Err(format!(
+            "Insufficient stock for goods ID {}. Available: {}, Requested: {}.",
+            data.goods_id, current_stock, data.quantity
+        ));
+    }
+
+    let total_price = price_per_item * Decimal::from(data.quantity);
+
+    // 2. Check user information and balance, and lock the row
+    let user_info: Option<(Decimal, i8)> = tx
+        .exec_first(
+            "SELECT balance, user_type FROM account WHERE id = :user_id AND user_type = 1 FOR UPDATE",
+            params! { "user_id" => data.user_id },
+        )
+        .map_err(|e| format!("Failed to query user: {}", e))?;
+
+    let (current_balance, user_type) = match user_info {
+        Some(info) => info,
+        None => {
+            return Err(format!(
+                "Customer account with ID {} not found.",
+                data.user_id
+            ));
+        }
+    };
+
+    if user_type != 1 {
+        return Err(format!("User with ID {} is not a customer.", data.user_id));
+    }
+
+    if current_balance < total_price {
+        return Err(format!(
+            "Insufficient balance for user ID {}. Required: {}, Available: {}.",
+            data.user_id, total_price, current_balance
+        ));
+    }
+
+    // 3. Update goods stock
+    tx.exec_drop(
+        "UPDATE goods SET stock = stock - :quantity WHERE id = :goods_id",
+        params! {
+            "quantity" => data.quantity,
+            "goods_id" => data.goods_id,
+        },
+    )
+    .map_err(|e| format!("Failed to update goods stock: {}", e))?;
+
+    // 4. Update user balance
+    tx.exec_drop(
+        "UPDATE account SET balance = balance - :total_price WHERE id = :user_id",
+        params! {
+            "total_price" => total_price,
+            "user_id" => data.user_id,
+        },
+    )
+    .map_err(|e| format!("Failed to update user balance: {}", e))?;
+
+    // 5. Record consumption
+    let current_month_str = Local::now().format("%Y-%m").to_string();
+    tx.exec_drop(
+        "INSERT INTO consumption (user_id, month, goods_id, amount) VALUES (:user_id, :month, :goods_id, :amount)
+         ON DUPLICATE KEY UPDATE amount = amount + VALUES(amount)",
+        params! {
+            "user_id" => data.user_id,
+            "month" => &current_month_str,
+            "goods_id" => data.goods_id,
+            "amount" => total_price,
+        },
+    )
+    .map_err(|e| format!("Failed to record consumption: {}", e))?;
+
+    // Commit transaction
+    tx.commit()
+        .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+    Ok(format!(
+        "Purchase successful for {} item(s) of goods ID {}. Total cost: {}. Remaining balance: {}.",
+        data.quantity,
+        data.goods_id,
+        total_price,
+        current_balance - total_price
+    ))
+}
+
+#[tauri::command]
+fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let query = "SELECT id, item_name, pick_place, pick_user_id, claim_user_id, pick_time, claim_time, status FROM lost_items ORDER BY pick_time DESC, id DESC";
+
+    let results: Vec<LostItem> = conn
+        .query_map(
+            query,
+            |(
+                id,
+                item_name,
+                pick_place,
+                pick_user_id,
+                claim_user_id,
+                pick_time,
+                claim_time,
+                status,
+            )| {
+                LostItem {
+                    id,
+                    item_name,
+                    pick_place,
+                    pick_user_id,
+                    claim_user_id,
+                    pick_time,
+                    claim_time,
+                    status,
+                }
+            },
+        )
+        .map_err(|e| format!("Database query failed for lost items: {}", e))?;
+
+    Ok(results)
+}
+
+#[tauri::command]
+fn report_lost_item(data: ReportLostItemData, mysql_pool: State<Pool>) -> Result<String, String> {
+    if data.item_name.is_empty() {
+        return Err("Item name cannot be empty".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let current_date = Local::now().date_naive();
+    let status: i8 = 0; // 0: Unclaimed
+
+    let result = conn.exec_drop(
+        "INSERT INTO lost_items (item_name, pick_place, pick_user_id, pick_time, status) VALUES (:item_name, :pick_place, :pick_user_id, :pick_time, :status)",
+        params! {
+            "item_name" => &data.item_name,
+            "pick_place" => &data.pick_place,
+            "pick_user_id" => &data.pick_user_id,
+            "pick_time" => current_date,
+            "status" => status,
+        }
+    );
+
+    match result {
+        Ok(_) => {
+            println!("Successfully reported lost item: {}", data.item_name);
+            Ok(format!(
+                "Lost item '{}' reported successfully.",
+                data.item_name
+            ))
+        }
+        Err(e) => {
+            eprintln!(
+                "Database insert failed for lost item {}: {}",
+                data.item_name, e
+            );
+            Err(format!("Database error while reporting lost item: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Result<String, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let current_date = Local::now().date_naive();
+    let new_status: i8 = 1; // 1: Claimed
+
+    // Check if the item exists and is unclaimed
+    let item_status: Option<i8> = conn
+        .exec_first(
+            "SELECT status FROM lost_items WHERE id = :item_id",
+            params! { "item_id" => data.item_id },
+        )
+        .map_err(|e| format!("Failed to query lost item status: {}", e))?;
+
+    match item_status {
+        Some(0) => {
+            // Status 0 means unclaimed
+            // Update item status, claimer user ID, and claim time
+            let update_result = conn.exec_drop(
+                "UPDATE lost_items SET status = :status, claim_user_id = :claim_user_id, claim_time = :claim_time WHERE id = :item_id",
+                params! {
+                    "status" => new_status,
+                    "claim_user_id" => data.claim_user_id,
+                    "claim_time" => current_date,
+                    "item_id" => data.item_id,
+                }
+            );
+
+            match update_result {
+                Ok(_) => {
+                    if conn.affected_rows() > 0 {
+                        println!(
+                            "Lost item ID {} claimed successfully by user ID {}.",
+                            data.item_id, data.claim_user_id
+                        );
+                        Ok(format!("Item ID {} claimed successfully.", data.item_id))
+                    } else {
+                        // Theoretically, if the previous query was successful, this update should succeed
+                        Err(format!("Failed to update item ID {}. It might have been claimed or deleted concurrently.", data.item_id))
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Database update failed for claiming item ID {}: {}",
+                        data.item_id, e
+                    );
+                    Err(format!("Database error while claiming item: {}", e))
+                }
+            }
+        }
+        Some(1) => Err(format!(
+            "Item ID {} has already been claimed.",
+            data.item_id
+        )),
+        None => Err(format!("Lost item with ID {} not found.", data.item_id)),
+        Some(_) => Err(format!("Unknown status for item ID {}.", data.item_id)), // Other unknown status
+    }
+}
+
+#[tauri::command]
+fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String, String> {
+    if data.message_content.is_empty() {
+        return Err("Message content cannot be empty".to_string());
+    }
+    if data.sender_id == data.receiver_id {
+        return Err("Sender and receiver cannot be the same user".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    // Optional: Check if sender_id and receiver_id exist in the account table
+    let sender_exists: Option<i64> = conn
+        .exec_first(
+            "SELECT id FROM account WHERE id = :id",
+            params! {"id" => data.sender_id},
+        )
+        .map_err(|e| format!("Failed to verify sender: {}", e))?;
+    if sender_exists.is_none() {
+        return Err(format!("Sender with ID {} not found.", data.sender_id));
+    }
+
+    let receiver_exists: Option<i64> = conn
+        .exec_first(
+            "SELECT id FROM account WHERE id = :id",
+            params! {"id" => data.receiver_id},
+        )
+        .map_err(|e| format!("Failed to verify receiver: {}", e))?;
+    if receiver_exists.is_none() {
+        return Err(format!("Receiver with ID {} not found.", data.receiver_id));
+    }
+
+    let current_date = Local::now().date_naive();
+    let read_status: i8 = 0; // 0: Unread
+
+    let result = conn.exec_drop(
+        "INSERT INTO message (sender_id, receiver_id, title, message_content, send_date, read_status) VALUES (:sender_id, :receiver_id, :title, :message_content, :send_date, :read_status)",
+        params! {
+            "sender_id" => data.sender_id,
+            "receiver_id" => data.receiver_id,
+            "title" => &data.title,
+            "message_content" => &data.message_content,
+            "send_date" => current_date,
+            "read_status" => read_status,
+        }
+    );
+
+    match result {
+        Ok(_) => {
+            println!(
+                "Message sent from {} to {}",
+                data.sender_id, data.receiver_id
+            );
+            Ok("Message sent successfully.".to_string())
+        }
+        Err(e) => {
+            eprintln!("Database insert failed for message: {}", e);
+            Err(format!("Database error while sending message: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let query = "
+        SELECT
+            m.id, m.sender_id, m.receiver_id,
+            s_acc.username AS sender_username,
+            r_acc.username AS receiver_username,
+            m.title, m.message_content, m.send_date, m.read_status
+        FROM message m
+        JOIN account s_acc ON m.sender_id = s_acc.id
+        JOIN account r_acc ON m.receiver_id = r_acc.id
+        WHERE m.sender_id = :user_id OR m.receiver_id = :user_id
+        ORDER BY m.send_date DESC, m.id DESC";
+
+    let results: Vec<MessageInfo> = conn
+        .exec_map(
+            query,
+            params! { "user_id" => user_id },
+            |(
+                id,
+                sender_id_db,
+                receiver_id_db,
+                sender_username,
+                receiver_username,
+                title,
+                message_content,
+                send_date,
+                read_status,
+            )| {
+                MessageInfo {
+                    id,
+                    sender_id: sender_id_db,
+                    receiver_id: receiver_id_db,
+                    sender_username,
+                    receiver_username,
+                    title,
+                    message_content,
+                    send_date,
+                    read_status,
+                    is_sender: sender_id_db == user_id,
+                }
+            },
+        )
+        .map_err(|e| format!("Database query failed for user messages: {}", e))?;
+
+    Ok(results)
+}
+
+#[tauri::command]
+fn mark_message_as_read(
+    data: MarkReadData,
+    current_user_id: i64, // ID of the user performing the action (should be the receiver)
+    mysql_pool: State<Pool>,
+) -> Result<String, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let result = conn.exec_drop(
+        "UPDATE message SET read_status = 1 WHERE id = :message_id AND receiver_id = :receiver_id AND read_status = 0",
+        params! {
+            "message_id" => data.message_id,
+            "receiver_id" => current_user_id,
+        }
+    );
+
+    match result {
+        Ok(_) => {
+            if conn.affected_rows() > 0 {
+                println!(
+                    "Message ID {} marked as read by user ID {}.",
+                    data.message_id, current_user_id
+                );
+                Ok(format!("Message ID {} marked as read.", data.message_id))
+            } else {
+                // Could be that message doesn't exist, user is not receiver, or already read
+                Err(format!("Failed to mark message ID {} as read. It might not exist, you might not be the receiver, or it was already read.", data.message_id))
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Database update failed for marking message read (ID {}): {}",
+                data.message_id, e
+            );
+            Err(format!(
+                "Database error while marking message as read: {}",
+                e
+            ))
+        }
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mysql_config: MySQLConfig = MySQLConfig::new(
@@ -493,7 +1078,16 @@ pub fn run() {
             get_user_details,
             get_user_monthly_consumption,
             update_user_details,
-            update_user_password
+            update_user_password,
+            add_goods,
+            update_goods_stock,
+            purchase_goods,
+            get_all_lost_items,
+            report_lost_item,
+            claim_lost_item,
+            send_message,
+            get_user_messages,
+            mark_message_as_read
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

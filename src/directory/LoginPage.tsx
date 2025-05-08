@@ -16,14 +16,15 @@ const LoginPage = () => {
     try {
       // 调用登录接口
       let res = await login(username, password);
-      if (res) {
+      if (res != 2) {
         // 登录成功，跳转到首页
-        navigate('/admin');
         messageApi.open({
           type: 'success',
           content: '登录成功',
           duration: 2,
         });
+        if (res == 0) navigate('/admin');
+        if (res == 1) navigate('/customer');
       } else {
         console.log('登录失败');
         messageApi.open({

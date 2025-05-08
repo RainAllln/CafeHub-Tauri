@@ -16,10 +16,10 @@ export const login = async (uname: string, pwd: string) => {
       username: uname,
       password: pwd,
     });
-    return true;
+    return account.user_type;
   } catch (error) {
     console.error("Login failed:", error);
-    return false;
+    return 2;
   }
 };
 

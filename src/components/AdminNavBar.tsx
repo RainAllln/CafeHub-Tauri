@@ -8,18 +8,11 @@ type MenuItem = Required<MenuProps>['items'][number];
 
 const items: MenuItem[] = [
   {
-    key: '/admin/consumption', // 使用路径作为 key
+    key: '/admin/info', // 使用路径作为 key
     label: (
-      <Link to="/admin/consumption">消费概览</Link>
+      <Link to="/admin/info">信息</Link>
     ),
     icon: <TransactionOutlined />,
-  },
-  {
-    key: '/admin/member',
-    label: (
-      <Link to="/admin/member">会员</Link>
-    ),
-    icon: <TeamOutlined />,
   },
   {
     key: '/admin/lost',
@@ -41,13 +34,6 @@ const items: MenuItem[] = [
       <Link to="/admin/message">消息</Link>
     ),
     icon: <MailOutlined />,
-  },
-  { // 新增的营收情况菜单项
-    key: '/admin/revenue',
-    label: (
-      <Link to="/admin/revenue">营收情况</Link>
-    ),
-    icon: <BarChartOutlined />,
   },
   {
     key: 'logout',

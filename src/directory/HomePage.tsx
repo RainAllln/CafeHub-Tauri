@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import NavBar from "@/components/NavBar";
+import NavBar from "@/components/AdminNavBar";
 
 interface Account {
   id: number;

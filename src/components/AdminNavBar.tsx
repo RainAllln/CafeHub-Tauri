@@ -1,56 +1,56 @@
-import React from 'react'; 
-import { TransactionOutlined, TeamOutlined, InboxOutlined, RestOutlined, MailOutlined, BarChartOutlined, LogoutOutlined } from '@ant-design/icons'; 
+import React from 'react';
+import { TransactionOutlined, TeamOutlined, InboxOutlined, RestOutlined, MailOutlined, BarChartOutlined, LogoutOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Menu } from 'antd';
-import { Link } from 'react-router-dom'; 
+import { Link } from 'react-router-dom';
 
 type MenuItem = Required<MenuProps>['items'][number];
 
 const items: MenuItem[] = [
   {
-    key: '/home/consumption', // 使用路径作为 key
+    key: '/admin/consumption', // 使用路径作为 key
     label: (
-      <Link to="/home/consumption">消费概览</Link> 
+      <Link to="/admin/consumption">消费概览</Link>
     ),
     icon: <TransactionOutlined />,
   },
   {
-    key: '/home/member',
+    key: '/admin/member',
     label: (
-      <Link to="/home/member">会员</Link>
+      <Link to="/admin/member">会员</Link>
     ),
     icon: <TeamOutlined />,
   },
   {
-    key: '/home/lost',
+    key: '/admin/lost',
     label: (
-      <Link to="/home/lost">失物</Link>
+      <Link to="/admin/lost">失物</Link>
     ),
     icon: <InboxOutlined />,
   },
   {
-    key: '/home/product',
+    key: '/admin/product',
     label: (
-      <Link to="/home/product">商品</Link>
+      <Link to="/admin/product">商品</Link>
     ),
     icon: <RestOutlined />,
   },
   {
-    key: '/home/message',
+    key: '/admin/message',
     label: (
-      <Link to="/home/message">消息</Link>
+      <Link to="/admin/message">消息</Link>
     ),
     icon: <MailOutlined />,
   },
   { // 新增的营收情况菜单项
-    key: '/home/revenue',             
+    key: '/admin/revenue',
     label: (
-      <Link to="/home/revenue">营收情况</Link> 
+      <Link to="/admin/revenue">营收情况</Link>
     ),
-    icon: <BarChartOutlined />,      
+    icon: <BarChartOutlined />,
   },
   {
-    key: 'logout', 
+    key: 'logout',
     label: (
       <Link to="/">退出</Link>
     ),
@@ -69,8 +69,8 @@ const NavBar: React.FC = () => {
       mode="inline"
       items={items}
       style={{
-        background: 'transparent', 
-        color: '#ffffff', 
+        background: 'transparent',
+        color: '#ffffff',
       }}
     />
   );

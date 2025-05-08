@@ -18,7 +18,7 @@ const LoginPage = () => {
       let res = await login(username, password);
       if (res) {
         // 登录成功，跳转到首页
-        navigate('/home');
+        navigate('/admin');
         messageApi.open({
           type: 'success',
           content: '登录成功',

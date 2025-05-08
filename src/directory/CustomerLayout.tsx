@@ -1,4 +1,4 @@
-import NavBar from '@/components/NavBar';
+import CustomerNavBar from '@/components/CustomNavBar';
 import WebTitle from '@/icon/WebTitle';
 import { ConfigProvider, Layout } from 'antd'
 import { Content } from 'antd/es/layout/layout';
@@ -52,7 +52,7 @@ const LayoutPage = () => {
           <div className='m-2 p-2 ml-5 rounded-lg'>
             <WebTitle collapsed={collapsed} />
           </div>
-          <NavBar />
+          <CustomerNavBar />
         </Sider>
         <Content>
           <div>

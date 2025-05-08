@@ -34,7 +34,7 @@ const RegisterPage = () => {
       let res = await register(username, password, phone, gendedr);
       if (res == 1) {
         // 登录成功，跳转到首页
-        navigate('/home');
+        navigate('/customer');
         messageApi.open({
           type: 'success',
           content: '注册成功',

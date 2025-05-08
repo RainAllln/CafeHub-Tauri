@@ -29,6 +29,10 @@ const router = createBrowserRouter([
     children: [
       // --- 修改/添加子路由 ---
       {
+        index: true, // 默认子路由
+        element: <AdminInfoPage />
+      },
+      {
         path: '/admin/info', // 这个路径指向 CostPage，
         element: <AdminInfoPage />
       },
@@ -51,6 +55,10 @@ const router = createBrowserRouter([
     element: <CustomerLayout />, // 主布局，包含侧边栏
     children: [
       // --- 修改/添加子路由 ---
+      {
+        index: true, // 默认子路由
+        element: <CustomerInfoPage />
+      },
       {
         path: '/customer/info', // 这个路径指向 CostPage，
         element: <CustomerInfoPage />

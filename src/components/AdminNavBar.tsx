@@ -54,6 +54,7 @@ const NavBar: React.FC = () => {
     <Menu
       mode="inline"
       items={items}
+      defaultSelectedKeys={['/admin/info']} // 默认选中项
       style={{
         background: 'transparent',
         color: '#ffffff',

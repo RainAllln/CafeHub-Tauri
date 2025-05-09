@@ -114,10 +114,16 @@ struct MessageInfo {
     is_sender: bool, // True if the current user is the sender of this message
 }
 
-#[derive(Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 struct MarkReadData {
     message_id: i64,
     // The user_id of the one marking it read will be passed to the function
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+struct UserBasicInfo {
+    id: i64,
+    username: String,
 }
 
 struct MySQLConfig {
@@ -1051,6 +1057,21 @@ fn mark_message_as_read(
     }
 }
 
+#[tauri::command]
+fn get_all_users(mysql_pool: State<Pool>) -> Result<Vec<UserBasicInfo>, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let query = "SELECT id, username FROM account ORDER BY id ASC";
+
+    let results: Vec<UserBasicInfo> = conn
+        .query_map(query, |(id, username)| UserBasicInfo { id, username })
+        .map_err(|e| format!("Database query failed for fetching all users: {}", e))?;
+
+    Ok(results)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mysql_config: MySQLConfig = MySQLConfig::new(
@@ -1087,7 +1108,8 @@ pub fn run() {
             claim_lost_item,
             send_message,
             get_user_messages,
-            mark_message_as_read
+            mark_message_as_read,
+            get_all_users
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

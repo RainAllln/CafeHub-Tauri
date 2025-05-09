@@ -67,11 +67,16 @@ struct RechargeBalanceData {
     amount: Decimal,
 }
 
+#[derive(Deserialize, Clone)] // New struct for an item in the purchase list
+struct PurchaseItem {
+    goods_id: i32,
+    quantity: i32,
+}
+
 #[derive(Deserialize)]
 struct PurchaseGoodsData {
     user_id: i64,
-    goods_id: i32,
-    quantity: i32,
+    items: Vec<PurchaseItem>, // Changed from single goods_id and quantity to a list of items
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -728,8 +733,17 @@ fn recharge_balance(data: RechargeBalanceData, mysql_pool: State<Pool>) -> Resul
 
 #[tauri::command]
 fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<String, String> {
-    if data.quantity <= 0 {
-        return Err("Quantity must be positive".to_string());
+    if data.items.is_empty() {
+        return Err("No items provided for purchase.".to_string());
+    }
+
+    for item in &data.items {
+        if item.quantity <= 0 {
+            return Err(format!(
+                "Quantity for goods ID {} must be positive.",
+                item.goods_id
+            ));
+        }
     }
 
     let mut conn = mysql_pool
@@ -741,30 +755,48 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<St
         .start_transaction(mysql::TxOpts::default())
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
-    // 1. Check goods information and stock, and lock the row
-    let goods_info: Option<(Decimal, i32)> = tx
-        .exec_first(
-            "SELECT price, stock FROM goods WHERE id = :goods_id FOR UPDATE",
-            params! { "goods_id" => data.goods_id },
-        )
-        .map_err(|e| format!("Failed to query goods: {}", e))?;
-
-    let (price_per_item, current_stock) = match goods_info {
-        Some(info) => info,
-        None => {
-            // tx will be rolled back automatically (because it was not committed)
-            return Err(format!("Goods with ID {} not found.", data.goods_id));
-        }
-    };
-
-    if current_stock < data.quantity {
-        return Err(format!(
-            "Insufficient stock for goods ID {}. Available: {}, Requested: {}.",
-            data.goods_id, current_stock, data.quantity
-        ));
+    let mut total_purchase_price = Decimal::ZERO;
+    // To store information about items being processed, including their price
+    struct ProcessedItemDetail {
+        goods_id: i32,
+        quantity: i32,
+        price_per_item: Decimal,
+        item_total_price: Decimal,
     }
+    let mut processed_item_details: Vec<ProcessedItemDetail> = Vec::new();
 
-    let total_price = price_per_item * Decimal::from(data.quantity);
+    // 1. Check stock for all goods, lock rows, and calculate total price
+    for item in &data.items {
+        let goods_info: Option<(Decimal, i32)> = tx
+            .exec_first(
+                "SELECT price, stock FROM goods WHERE id = :goods_id FOR UPDATE",
+                params! { "goods_id" => item.goods_id },
+            )
+            .map_err(|e| format!("Failed to query goods ID {}: {}", item.goods_id, e))?;
+
+        let (price_per_item, current_stock) = match goods_info {
+            Some(info) => info,
+            None => {
+                return Err(format!("Goods with ID {} not found.", item.goods_id));
+            }
+        };
+
+        if current_stock < item.quantity {
+            return Err(format!(
+                "Insufficient stock for goods ID {}. Available: {}, Requested: {}.",
+                item.goods_id, current_stock, item.quantity
+            ));
+        }
+
+        let item_total_price = price_per_item * Decimal::from(item.quantity);
+        total_purchase_price += item_total_price;
+        processed_item_details.push(ProcessedItemDetail {
+            goods_id: item.goods_id,
+            quantity: item.quantity,
+            price_per_item,
+            item_total_price,
+        });
+    }
 
     // 2. Check user information and balance, and lock the row
     let user_info: Option<(Decimal, i8)> = tx
@@ -774,7 +806,8 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<St
         )
         .map_err(|e| format!("Failed to query user: {}", e))?;
 
-    let (current_balance, user_type) = match user_info {
+    let (current_balance, _user_type) = match user_info {
+        // user_type is already checked by `user_type = 1` in SQL
         Some(info) => info,
         None => {
             return Err(format!(
@@ -784,61 +817,65 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<St
         }
     };
 
-    if user_type != 1 {
-        return Err(format!("User with ID {} is not a customer.", data.user_id));
-    }
-
-    if current_balance < total_price {
+    if current_balance < total_purchase_price {
         return Err(format!(
             "Insufficient balance for user ID {}. Required: {}, Available: {}.",
-            data.user_id, total_price, current_balance
+            data.user_id, total_purchase_price, current_balance
         ));
     }
 
-    // 3. Update goods stock
-    tx.exec_drop(
-        "UPDATE goods SET stock = stock - :quantity WHERE id = :goods_id",
-        params! {
-            "quantity" => data.quantity,
-            "goods_id" => data.goods_id,
-        },
-    )
-    .map_err(|e| format!("Failed to update goods stock: {}", e))?;
+    // 3. Update goods stock for each item
+    for p_item_detail in &processed_item_details {
+        tx.exec_drop(
+            "UPDATE goods SET stock = stock - :quantity WHERE id = :goods_id",
+            params! {
+                "quantity" => p_item_detail.quantity,
+                "goods_id" => p_item_detail.goods_id,
+            },
+        )
+        .map_err(|e| {
+            format!(
+                "Failed to update stock for goods ID {}: {}",
+                p_item_detail.goods_id, e
+            )
+        })?;
+    }
 
     // 4. Update user balance
     tx.exec_drop(
         "UPDATE account SET balance = balance - :total_price WHERE id = :user_id",
         params! {
-            "total_price" => total_price,
+            "total_price" => total_purchase_price,
             "user_id" => data.user_id,
         },
     )
     .map_err(|e| format!("Failed to update user balance: {}", e))?;
 
-    // 5. Record consumption
+    // 5. Record consumption for each item
     let current_month_str = Local::now().format("%Y-%m").to_string();
-    tx.exec_drop(
-        "INSERT INTO consumption (user_id, month, goods_id, amount) VALUES (:user_id, :month, :goods_id, :amount)
-         ON DUPLICATE KEY UPDATE amount = amount + VALUES(amount)",
-        params! {
-            "user_id" => data.user_id,
-            "month" => &current_month_str,
-            "goods_id" => data.goods_id,
-            "amount" => total_price,
-        },
-    )
-    .map_err(|e| format!("Failed to record consumption: {}", e))?;
+    for p_item_detail in &processed_item_details {
+        tx.exec_drop(
+            "INSERT INTO consumption (user_id, month, goods_id, amount) VALUES (:user_id, :month, :goods_id, :amount)
+             ON DUPLICATE KEY UPDATE amount = amount + VALUES(amount)",
+            params! {
+                "user_id" => data.user_id,
+                "month" => &current_month_str,
+                "goods_id" => p_item_detail.goods_id,
+                "amount" => p_item_detail.item_total_price, // Use the total price for this specific item
+            },
+        )
+        .map_err(|e| format!("Failed to record consumption for goods ID {}: {}", p_item_detail.goods_id, e))?;
+    }
 
     // Commit transaction
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
     Ok(format!(
-        "Purchase successful for {} item(s) of goods ID {}. Total cost: {}. Remaining balance: {}.",
-        data.quantity,
-        data.goods_id,
-        total_price,
-        current_balance - total_price
+        "Purchase of {} item type(s) successful. Total cost: {}. Remaining balance: {}.",
+        processed_item_details.len(),
+        total_purchase_price,
+        current_balance - total_purchase_price
     ))
 }
 
@@ -963,6 +1000,7 @@ fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Result<S
                         Ok(format!("Item ID {} claimed successfully.", data.item_id))
                     } else {
                         // Theoretically, if the previous query was successful, this update should succeed
+                        // and user_id is valid, but good for robustness.
                         Err(format!("Failed to update item ID {}. It might have been claimed or deleted concurrently.", data.item_id))
                     }
                 }

@@ -1,10 +1,10 @@
 import CustomerNavBar from '@/components/CustomNavBar';
 import WebTitle from '@/icon/WebTitle';
-import { ConfigProvider, Layout } from 'antd'
+import { ConfigProvider, Layout } from 'antd';
 import { Content } from 'antd/es/layout/layout';
 import Sider from 'antd/es/layout/Sider';
-import React, { useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router'
+import React, { useEffect, useState } from 'react';
+import { Outlet, useNavigate } from 'react-router';
 /**
  * 左侧导航栏，中间部分设置各页面
  * 一级路由是LayoutPage，二级路由是各个页面
@@ -12,9 +12,9 @@ import { Outlet, useNavigate } from 'react-router'
  */
 
 const LayoutPage = () => {
-  const navigate = useNavigate()
-
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const siderWidth = collapsed ? 80 : 200; // Ant Design default Sider widths
 
   // useEffect(
   //   () => {
@@ -43,25 +43,44 @@ const LayoutPage = () => {
             itemHoverBg: '#D2691E', // 更浅的菜单悬停背景色
             itemMarginBlock: 30,  // 菜单项之间的间距
           },
-
         },
       }}
     >
-      <Layout className='min-h-screen'>
-        <Sider collapsible collapsed={collapsed} onCollapse={(value) => setCollapsed(value)} className='min-h-screen'>
+      <Layout style={{ height: '100vh' }}>
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={(value) => setCollapsed(value)}
+          width={200} // Explicit width
+          collapsedWidth={80} // Explicit collapsed width
+          style={{
+            height: '100vh',
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            zIndex: 100, // Ensure Sider is on top
+            overflowY: 'auto', // Allow internal scrolling for Sider if menu is too long
+            // The siderBg from theme should apply here
+          }}
+        >
           <div className='m-2 p-2 ml-5 rounded-lg'>
             <WebTitle collapsed={collapsed} />
           </div>
           <CustomerNavBar />
         </Sider>
-        <Content>
-          <div>
-            <Outlet /> {/* 这里是二级路由的内容 */}
-          </div>
+        <Content
+          style={{
+            marginLeft: `${siderWidth}px`, // Offset content by Sider's width
+            height: '100vh', // Content area takes full viewport height
+            overflowY: 'auto', // Enable vertical scrolling for content area
+            // Pages rendered by Outlet (like CustomerProductPage) will manage their own internal padding
+          }}
+        >
+          <Outlet /> {/* 这里是二级路由的内容 */}
         </Content>
       </Layout>
     </ConfigProvider>
-  )
-}
+  );
+};
 
-export default LayoutPage
+export default LayoutPage;

@@ -56,8 +56,10 @@ struct AddGoodsData {
 }
 
 #[derive(Deserialize)]
-struct UpdateGoodsStockData {
-    stock: i32,
+struct UpdateGoodsData {
+    // Renamed from UpdateGoodsStockData
+    stock: Option<i32>,     // Made optional
+    price: Option<Decimal>, // Added price field
 }
 
 #[derive(Deserialize)]
@@ -593,48 +595,66 @@ fn add_goods(data: AddGoodsData, mysql_pool: State<Pool>) -> Result<String, Stri
 }
 
 #[tauri::command]
-fn update_goods_stock(
+fn update_goods_info(
     goods_id: i32,
-    data: UpdateGoodsStockData,
+    data: UpdateGoodsData,
     mysql_pool: State<Pool>,
 ) -> Result<String, String> {
-    if data.stock < 0 {
-        return Err("Stock cannot be negative".to_string());
-    }
-
     let mut conn = mysql_pool
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    let result = conn.exec_drop(
-        "UPDATE goods SET stock = :stock WHERE id = :goods_id",
-        params! {
-            "stock" => data.stock,
-            "goods_id" => goods_id,
-        },
+    let mut set_clauses: Vec<String> = Vec::new();
+    let mut query_params: Vec<(String, mysql::Value)> = Vec::new();
+
+    if let Some(stock_val) = data.stock {
+        if stock_val < 0 {
+            return Err("Stock cannot be negative".to_string());
+        }
+        set_clauses.push("stock = :stock".to_string());
+        query_params.push(("stock".to_string(), stock_val.into()));
+    }
+
+    if let Some(price_val) = data.price {
+        if price_val <= Decimal::ZERO {
+            return Err("Price must be positive".to_string());
+        }
+        set_clauses.push("price = :price".to_string());
+        query_params.push(("price".to_string(), price_val.into()));
+    }
+
+    if set_clauses.is_empty() {
+        return Ok("No details provided to update.".to_string());
+    }
+
+    query_params.push(("goods_id".to_string(), goods_id.into()));
+
+    let query = format!(
+        "UPDATE goods SET {} WHERE id = :goods_id",
+        set_clauses.join(", ")
     );
 
-    match result {
+    match conn.exec_drop(&query, mysql::Params::from(query_params)) {
         Ok(_) => {
             if conn.affected_rows() > 0 {
-                println!("Successfully updated stock for goods ID: {}", goods_id);
+                println!("Successfully updated info for goods ID: {}", goods_id);
                 Ok(format!(
-                    "Stock for goods ID {} updated successfully.",
+                    "Info for goods ID {} updated successfully.",
                     goods_id
                 ))
             } else {
                 Err(format!(
-                    "Goods with ID {} not found or stock was already the same.",
+                    "Goods with ID {} not found or no changes made.",
                     goods_id
                 ))
             }
         }
         Err(e) => {
             eprintln!(
-                "Database update failed for goods stock (ID {}): {}",
+                "Database update failed for goods info (ID {}): {}",
                 goods_id, e
             );
-            Err(format!("Database error while updating stock: {}", e))
+            Err(format!("Database error while updating goods info: {}", e))
         }
     }
 }
@@ -1101,7 +1121,7 @@ pub fn run() {
             update_user_details,
             update_user_password,
             add_goods,
-            update_goods_stock,
+            update_goods_info,
             purchase_goods,
             get_all_lost_items,
             report_lost_item,

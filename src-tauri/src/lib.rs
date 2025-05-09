@@ -57,9 +57,14 @@ struct AddGoodsData {
 
 #[derive(Deserialize)]
 struct UpdateGoodsData {
-    // Renamed from UpdateGoodsStockData
     stock: Option<i32>,     // Made optional
     price: Option<Decimal>, // Added price field
+}
+
+#[derive(Deserialize)]
+struct RechargeBalanceData {
+    user_id: i64,
+    amount: Decimal,
 }
 
 #[derive(Deserialize)]
@@ -660,6 +665,68 @@ fn update_goods_info(
 }
 
 #[tauri::command]
+fn recharge_balance(data: RechargeBalanceData, mysql_pool: State<Pool>) -> Result<String, String> {
+    if data.amount <= Decimal::ZERO {
+        return Err("Recharge amount must be positive".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    // Check if the user exists and is a customer
+    let user_exists: Option<i8> = conn
+        .exec_first(
+            "SELECT user_type FROM account WHERE id = :user_id",
+            params! { "user_id" => data.user_id },
+        )
+        .map_err(|e| format!("Failed to query user: {}", e))?;
+
+    match user_exists {
+        Some(1) => {
+            // User is a customer
+            let update_result = conn.exec_drop(
+                "UPDATE account SET balance = balance + :amount WHERE id = :user_id AND user_type = 1",
+                params! {
+                    "amount" => data.amount,
+                    "user_id" => data.user_id,
+                },
+            );
+
+            match update_result {
+                Ok(_) => {
+                    if conn.affected_rows() > 0 {
+                        println!(
+                            "Successfully recharged {} for user ID: {}. New balance might be reflected in a subsequent query.",
+                            data.amount, data.user_id
+                        );
+                        Ok(format!(
+                            "Successfully recharged {} for user ID {}.",
+                            data.amount, data.user_id
+                        ))
+                    } else {
+                        // Should not happen if user_exists check passed, but good for robustness
+                        Err(format!(
+                            "Failed to recharge balance for user ID {}. User not found or no change made.",
+                            data.user_id
+                        ))
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Database update failed for balance recharge (user ID {}): {}",
+                        data.user_id, e
+                    );
+                    Err(format!("Database error while recharging balance: {}", e))
+                }
+            }
+        }
+        Some(_) => Err(format!("User with ID {} is not a customer.", data.user_id)), // User is not a customer
+        None => Err(format!("User with ID {} not found.", data.user_id)),
+    }
+}
+
+#[tauri::command]
 fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<String, String> {
     if data.quantity <= 0 {
         return Err("Quantity must be positive".to_string());
@@ -1129,7 +1196,8 @@ pub fn run() {
             send_message,
             get_user_messages,
             mark_message_as_read,
-            get_all_users
+            get_all_users,
+            recharge_balance
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

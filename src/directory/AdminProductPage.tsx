@@ -1,6 +1,7 @@
 import AddGoodsBtn from '@/components/AddGoodsBtn';
 import EditGoodsBtn from '@/components/EditGoodsBtn';
-import { Table, Space } from 'antd';
+import { Table, Space, TableProps } from 'antd';
+import { SortOrder } from 'antd/es/table/interface';
 import React, { useState } from 'react';
 
 // 定义商品接口
@@ -36,7 +37,7 @@ const AdminProductPage = () => {
     setProducts(products.map(p => (p.id === updatedProduct.id ? updatedProduct : p))); // 更新商品列表
   }
 
-  const columns = [
+  const columns: TableProps<Product>['columns'] = [
     {
       title: '商品名称',
       dataIndex: 'name',
@@ -47,16 +48,28 @@ const AdminProductPage = () => {
       dataIndex: 'price',
       key: 'price',
       render: (price: number) => `¥${price.toFixed(2)}`,
+      sorter: (a: Product, b: Product) => a.price - b.price,
+      sortDirections: ['descend', 'ascend'] as SortOrder[],
     },
     {
       title: '库存',
       dataIndex: 'stock',
       key: 'stock',
+      sorter: (a: Product, b: Product) => a.stock - b.stock,
+      sortDirections: ['descend', 'ascend'] as SortOrder[],
     },
     {
       title: '类别',
       dataIndex: 'category',
       key: 'category',
+      filters: categories.map(category => ({ text: category, value: category })),
+      onFilter: (value: React.Key | boolean, record: Product) => {
+        if (typeof value === 'string') {
+          return record.category.includes(value);
+        }
+        return false;
+      },
+      filterMultiple: true,
     },
     {
       title: '操作',
@@ -77,6 +90,16 @@ const AdminProductPage = () => {
     setEditingKey('');
   };
 
+  const tableLocale = {
+    sortTitle: '排序',
+    filterTitle: '筛选',
+    filterConfirm: '确定',
+    filterReset: '重置',
+    cancelSort: '点击取消排序',
+    triggerAsc: '点击按升序排序',
+    triggerDesc: '点击按降序排序',
+  };
+
   return (
     <div style={{ padding: '20px' }}>
       <AddGoodsBtn
@@ -92,6 +115,7 @@ const AdminProductPage = () => {
         bordered
         title={() => '商品管理表格'}
         pagination={{ onChange: cancel, pageSize: 5 }}
+        locale={tableLocale}
       />
 
     </div>

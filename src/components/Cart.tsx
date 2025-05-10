@@ -104,19 +104,26 @@ const Cart: React.FC<CartProps> = ({ cart, setCart, products, setIsCartDrawerVis
                 return (
                   <List.Item
                     actions={[
-                      <Button type="link" danger onClick={() => removeFromCart(item.id)}>移除</Button>
+                      // This should be empty as actions are handled in the row below
                     ]}
                   >
-                    <List.Item.Meta
-                      title={item.name}
-                      description={`单价: ¥${item.price.toFixed(2)}`}
-                    />
-                    <Space>
-                      <Button size="small" onClick={() => updateQuantityInCart(item.id, item.quantity - 1)} disabled={item.quantity <= 1}>-</Button>
-                      <InputNumber size="small" min={1} max={item.quantity + currentItemStock} value={item.quantity} onChange={(value) => updateQuantityInCart(item.id, value as number)} style={{ width: '50px' }} />
-                      <Button size="small" onClick={() => updateQuantityInCart(item.id, item.quantity + 1)} disabled={currentItemStock === 0}>+</Button>
-                    </Space>
-                    <div style={{ marginLeft: '10px', width: '80px', textAlign: 'right' }}>¥{(item.price * item.quantity).toFixed(2)}</div>
+                    <div style={{ width: '100%' }}>
+                      <List.Item.Meta
+                        title={item.name}
+                        description={`单价: ¥${item.price.toFixed(2)}`}
+                      />
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginTop: '8px' }}>
+                        <Space> {/* Quantity controls */}
+                          <Button size="small" onClick={() => updateQuantityInCart(item.id, item.quantity - 1)} disabled={item.quantity <= 1}>-</Button>
+                          <InputNumber size="small" min={1} max={item.quantity + currentItemStock} value={item.quantity} onChange={(value) => updateQuantityInCart(item.id, value as number)} style={{ width: '50px' }} />
+                          <Button size="small" onClick={() => updateQuantityInCart(item.id, item.quantity + 1)} disabled={currentItemStock === 0}>+</Button>
+                        </Space>
+                        <div style={{ display: 'flex', alignItems: 'center' }}> {/* Group for price and remove button */}
+                          <div style={{ marginRight: '10px', width: '80px', textAlign: 'right' }}>¥{(item.price * item.quantity).toFixed(2)}</div>
+                          <Button type="link" danger onClick={() => removeFromCart(item.id)}>移除</Button>
+                        </div>
+                      </div>
+                    </div>
                   </List.Item>
                 );
               }}

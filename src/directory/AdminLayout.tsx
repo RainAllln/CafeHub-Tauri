@@ -14,8 +14,9 @@ import { Outlet, useNavigate } from 'react-router'
 const LayoutPage = () => {
   const navigate = useNavigate()
 
-  const [collapsed, setCollapsed] = useState(false);
 
+  const [collapsed, setCollapsed] = useState(false);
+  const siderWidth = collapsed ? 80 : 200; // Ant Design default Sider widths
   // useEffect(
   //   () => {
   //     const isAuthenticated = localStorage.getItem('isAuthenticated');
@@ -48,13 +49,32 @@ const LayoutPage = () => {
       }}
     >
       <Layout className='min-h-screen'>
-        <Sider collapsible collapsed={collapsed} onCollapse={(value) => setCollapsed(value)} className='min-h-screen'>
+        <Sider
+          collapsible
+          collapsed={collapsed}
+          onCollapse={(value) => setCollapsed(value)}
+          className='min-h-screen'
+          style={{
+            height: '100vh',
+            position: 'fixed',
+            left: 0,
+            top: 0,
+            zIndex: 100,
+            overflowY: 'auto',
+          }}
+        >
           <div className='m-2 p-2 ml-5 rounded-lg'>
             <WebTitle collapsed={collapsed} />
           </div>
           <AdminNavBar />
         </Sider>
-        <Content>
+        <Content
+          style={{
+            marginLeft: `${siderWidth}px`,
+            height: '100vh',
+            overflowY: 'auto',
+          }}
+        >
           <div>
             <Outlet /> {/* 这里是二级路由的内容 */}
           </div>

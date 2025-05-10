@@ -80,23 +80,6 @@ const ReportLost: React.FC<ReportLostProps> = ({ isModalOpen, setIsModalOpen, lo
           >
             <DatePicker className="w-full" placeholder="选择日期" />
           </Form.Item>
-          <Form.Item
-            name="pickerUsername"
-            label="拾取人姓名"
-            rules={[{ required: true, message: '请输入拾取人姓名!' }]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="pickerPhone"
-            label="拾取人联系电话"
-            rules={[
-              { required: true, message: '请输入拾取人联系电话!' },
-              { pattern: /^\d{11}$/, message: '请输入有效的11位电话号码!' }
-            ]}
-          >
-            <Input type="tel" maxLength={11} />
-          </Form.Item>
         </Form>
       </Modal>
     </>

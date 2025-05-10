@@ -15,18 +15,18 @@ const items: MenuItem[] = [
     icon: <TransactionOutlined />,
   },
   {
-    key: '/customer/lost',
-    label: (
-      <Link to="/customer/lost">失物</Link>
-    ),
-    icon: <InboxOutlined />,
-  },
-  {
     key: '/customer/product',
     label: (
       <Link to="/customer/product">商品</Link>
     ),
     icon: <RestOutlined />,
+  },
+  {
+    key: '/customer/lost',
+    label: (
+      <Link to="/customer/lost">失物</Link>
+    ),
+    icon: <InboxOutlined />,
   },
   {
     key: '/customer/message',

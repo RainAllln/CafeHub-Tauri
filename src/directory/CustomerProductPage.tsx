@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button, Card, Col, Row, FloatButton, Typography, Divider, message } from 'antd';
 import { ShoppingCartOutlined } from '@ant-design/icons';
 import Cart from '../components/Cart';
+import ProductInfo from '@/components/ProductInfo';
 
 interface Product {
   id: number;
@@ -73,27 +74,7 @@ const CustomerProductPage = () => {
               .filter(p => p.category === category)
               .map(p => (
                 <Col key={p.id} xs={24} sm={12} md={8} lg={6}>
-                  <Card
-                    hoverable
-                    title={p.name}
-                    actions={[
-                      <Button
-                        type="primary"
-                        onClick={() => addToCart(p)}
-                        disabled={p.stock === 0}
-                        block
-                      >
-                        {p.stock === 0 ? '已售罄' : '添加到购物车'}
-                      </Button>
-                    ]}
-                  >
-                    <Card.Meta
-                      description={`价格: ¥${p.price.toFixed(2)}`}
-                    />
-                    <Typography.Text type={p.stock === 0 ? "danger" : "secondary"} style={{ display: 'block', marginTop: '8px' }}>
-                      库存: {p.stock}
-                    </Typography.Text>
-                  </Card>
+                  <ProductInfo p={p} addToCart={addToCart} />
                 </Col>
               ))}
           </Row>

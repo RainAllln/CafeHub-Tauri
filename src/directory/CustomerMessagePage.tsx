@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Table, Button, Tag, Typography, } from 'antd';
 import { EyeOutlined, SendOutlined } from '@ant-design/icons';
-import CusMessageContent from '@/components/CusMessageContent';
 import CusSendMessage from '@/components/CusSendMessage';
+import MessageContent from '@/components/MessageContent';
 
 const { Title } = Typography;
 
@@ -143,11 +143,11 @@ const CustomerMessagePage = () => {
 
       {/* View Message Modal */}
       {selectedMessage && (
-        <CusMessageContent
+        <MessageContent
           selectedMessage={selectedMessage}
-          isViewModalVisible={isViewModalVisible}
+          isModalVisible={isViewModalVisible}
+          setIsModalVisible={setIsViewModalVisible}
           setSelectedMessage={setSelectedMessage}
-          setIsViewModalVisible={setIsViewModalVisible}
         />
       )}
 

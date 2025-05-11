@@ -1,4 +1,4 @@
-import { CheckCircleOutlined, EyeOutlined, MailOutlined, SendOutlined } from '@ant-design/icons';
+import { EyeOutlined, SendOutlined } from '@ant-design/icons';
 import { Button, Table, Tag } from 'antd'
 import React from 'react'
 
@@ -45,14 +45,6 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
     }
   };
 
-  const toggleReadStatus = (messageId: number) => {
-    setMessages(
-      messages.map((msg) =>
-        msg.id === messageId ? { ...msg, read_status: msg.read_status === 0 ? 1 : 0 } : msg
-      )
-    );
-  };
-
   const handleOpenReplyModal = (message: Message) => {
     setReplyingToMessage(message);
     setIsReplyModalVisible(true);
@@ -60,9 +52,9 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
 
   const receivedMessagesColumns = [
     {
-      title: '用户ID',
+      title: '用户名',
       dataIndex: 'sender_id',
-      key: 'sender_id',
+      key: 'sender_name',
       render: (sender_id: number) => `User ${sender_id}`,
     },
     {
@@ -107,17 +99,6 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
             size="small"
           >
             查看
-          </Button>
-          <Button
-            icon={record.read_status === 0 ? <MailOutlined /> : <CheckCircleOutlined />}
-            onClick={() => toggleReadStatus(record.id)}
-            className={`${record.read_status === 0
-              ? 'text-orange-500 border-orange-500 hover:text-orange-700 hover:border-orange-700'
-              : 'text-green-500 border-green-500 hover:text-green-700 hover:border-green-700'
-              }`}
-            size="small"
-          >
-            {record.read_status === 0 ? '标记已读' : '标记未读'}
           </Button>
           <Button
             icon={<SendOutlined />}

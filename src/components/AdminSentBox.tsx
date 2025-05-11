@@ -33,9 +33,9 @@ const AdminSentBox: React.FC<AdminSentBoxProps> = ({
 
   const sentMessagesColumns = [
     {
-      title: '接收用户ID',
+      title: '接收用户名',
       dataIndex: 'receiver_id',
-      key: 'receiver_id',
+      key: 'receiver_name',
       render: (receiver_id: number) => `User ${receiver_id}`,
     },
     {

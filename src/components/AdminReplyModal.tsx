@@ -5,22 +5,22 @@ const { TextArea } = Input;
 const { Title } = Typography;
 
 // Interface for messages sent by the admin
-interface AdminSentMessage {
+interface Message {
   id: number;
-  sender_id: number;    // Admin's ID
-  receiver_id: number;  // User's ID (original sender)
+  sender_id: number;
+  receiver_id: number; // For received messages, this is the Admin's ID
   title: string;
   message_content: string;
   send_date: string;
-  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
+  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
 }
 
 interface AdminReplyModalProps {
   visible: boolean;
   recipientId: number;
   originalMessageTitle?: string;
-  adminSentMessages: AdminSentMessage[];
-  setAdminSentMessages: React.Dispatch<React.SetStateAction<AdminSentMessage[]>>;
+  adminSentMessages: Message[];
+  setAdminSentMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   handleCloseReplyModal: () => void;
 }
 
@@ -36,7 +36,7 @@ const AdminReplyModal: React.FC<AdminReplyModalProps> = ({
 
   const onSend = (replyTitle: string, replyContent: string) => {
 
-    const newReply: AdminSentMessage = {
+    const newReply: Message = {
       id: Date.now(), // Mock ID
       sender_id: 1,
       receiver_id: recipientId, // Reply to the original sender

@@ -3,19 +3,19 @@ import { Button, Table, Tag } from 'antd'
 import React from 'react'
 
 // Interface for messages sent by the admin
-interface AdminSentMessage {
+interface Message {
   id: number;
-  sender_id: number;    // Admin's ID
-  receiver_id: number;  // User's ID (original sender)
+  sender_id: number;
+  receiver_id: number; // For received messages, this is the Admin's ID
   title: string;
   message_content: string;
   send_date: string;
-  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
+  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
 }
 
 interface AdminSentBoxProps {
-  adminSentMessages: AdminSentMessage[];
-  setSelectedMessage: React.Dispatch<React.SetStateAction<AdminSentMessage | null>>;
+  adminSentMessages: Message[];
+  setSelectedMessage: React.Dispatch<React.SetStateAction<Message | null>>;
   setIsMessageModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
@@ -25,7 +25,7 @@ const AdminSentBox: React.FC<AdminSentBoxProps> = ({
   setIsMessageModalVisible,
 }) => {
 
-  const handleViewMessage = (message: AdminSentMessage) => {
+  const handleViewMessage = (message: Message) => {
     setSelectedMessage(message);
     setIsMessageModalVisible(true);
   };
@@ -47,7 +47,7 @@ const AdminSentBox: React.FC<AdminSentBoxProps> = ({
       title: '发送日期',
       dataIndex: 'send_date',
       key: 'send_date',
-      sorter: (a: AdminSentMessage, b: AdminSentMessage) => new Date(a.send_date).getTime() - new Date(b.send_date).getTime(),
+      sorter: (a: Message, b: Message) => new Date(a.send_date).getTime() - new Date(b.send_date).getTime(),
       defaultSortOrder: 'descend' as const,
     },
     {
@@ -63,7 +63,7 @@ const AdminSentBox: React.FC<AdminSentBoxProps> = ({
     {
       title: '行动',
       key: 'actions',
-      render: (_: any, record: AdminSentMessage) => (
+      render: (_: any, record: Message) => (
         <div className="space-x-2 flex">
           <Button
             icon={<EyeOutlined />}

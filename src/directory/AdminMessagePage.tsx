@@ -17,17 +17,6 @@ interface Message {
   read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
 }
 
-// Interface for messages sent by the admin
-interface AdminSentMessage {
-  id: number;
-  sender_id: number;    // Admin's ID
-  receiver_id: number;  // User's ID (original sender)
-  title: string;
-  message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
-}
-
 const ADMIN_ID = 1; // Assuming Admin's ID is 1
 
 // Mock data for received messages
@@ -81,12 +70,12 @@ const mockMessages: Message[] = [
 
 const AdminMessagePage = () => {
   const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [selectedMessage, setSelectedMessage] = useState<Message | AdminSentMessage | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   const [isReplyModalVisible, setIsReplyModalVisible] = useState(false);
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
-  const [adminSentMessages, setAdminSentMessages] = useState<AdminSentMessage[]>([]);
+  const [adminSentMessages, setAdminSentMessages] = useState<Message[]>([]);
   const [currentView, setCurrentView] = useState<'inbox' | 'sent'>('inbox'); // New state for view toggle
 
   const handleCloseReplyModal = () => {

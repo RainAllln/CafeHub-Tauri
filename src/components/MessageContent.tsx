@@ -13,11 +13,21 @@ interface Message {
   read_status: 0 | 1;
 }
 
+interface AdminSentMessage {
+  id: number;
+  sender_id: number;    // Admin's ID
+  receiver_id: number;  // User's ID (original sender)
+  title: string;
+  message_content: string;
+  send_date: string;
+  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
+}
+
 interface MessageContentProps {
-  selectedMessage: Message;
+  selectedMessage: Message | AdminSentMessage;
   isModalVisible: boolean;
   setIsModalVisible: (visible: boolean) => void;
-  setSelectedMessage: (message: Message | null) => void;
+  setSelectedMessage: (message: Message | AdminSentMessage | null) => void;
 }
 
 const MessageContent: React.FC<MessageContentProps> = ({ selectedMessage, isModalVisible, setIsModalVisible, setSelectedMessage }) => {

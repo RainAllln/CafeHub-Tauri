@@ -1,26 +1,41 @@
 import { useState } from 'react';
-import { Table, Button, Tag, Typography } from 'antd'; // Removed Radio
-import { EyeOutlined, MailOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Table, Button, Tag, Typography, message, Radio } from 'antd'; // Added Radio
 import MessageContent from '@/components/MessageContent';
+import AdminReplyModal from '@/components/AdminReplyModal';
+import AdminReciveBox from '@/components/AdminReciveBox';
+import AdminSentBox from '@/components/AdminSentBox';
 
 const { Title } = Typography;
 
 interface Message {
   id: number;
   sender_id: number;
-  receiver_id: number;
+  receiver_id: number; // For received messages, this is the Admin's ID
   title: string;
   message_content: string;
   send_date: string;
-  read_status: 0 | 1;
+  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
 }
 
-// Mock data based on the table structure
+// Interface for messages sent by the admin
+interface AdminSentMessage {
+  id: number;
+  sender_id: number;    // Admin's ID
+  receiver_id: number;  // User's ID (original sender)
+  title: string;
+  message_content: string;
+  send_date: string;
+  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
+}
+
+const ADMIN_ID = 1; // Assuming Admin's ID is 1
+
+// Mock data for received messages
 const mockMessages: Message[] = [
   {
     id: 1,
     sender_id: 101,
-    receiver_id: 1, // Admin's ID
+    receiver_id: ADMIN_ID,
     title: 'Regarding recent order #12345',
     message_content: 'Hello Admin, I have a query regarding my recent order #12345. The delivery status has not been updated for 3 days. Could you please look into this? Thanks.',
     send_date: '2025-05-08',
@@ -29,7 +44,7 @@ const mockMessages: Message[] = [
   {
     id: 2,
     sender_id: 102,
-    receiver_id: 1,
+    receiver_id: ADMIN_ID,
     title: 'Feedback on new product feature',
     message_content: 'Hi Admin, I wanted to share some feedback on the new product feature launched last week. It\'s great, but I think adding a customizable dashboard would be even better. Keep up the good work!',
     send_date: '2025-05-07',
@@ -38,7 +53,7 @@ const mockMessages: Message[] = [
   {
     id: 3,
     sender_id: 103,
-    receiver_id: 1,
+    receiver_id: ADMIN_ID,
     title: 'Account password reset request',
     message_content: 'Dear Admin, I am unable to reset my account password. The reset link seems to be expired. Can you please assist me with this issue? My username is user103.',
     send_date: '2025-05-09',
@@ -46,120 +61,74 @@ const mockMessages: Message[] = [
   },
   {
     id: 4,
-    sender_id: 104,
-    receiver_id: 1,
-    title: 'Suggestion for service improvement',
-    message_content: 'Hello, I have a suggestion to improve the customer support service. It would be helpful to have a live chat option available 24/7. Thank you for considering.',
-    send_date: '2025-05-06',
-    read_status: 1,
+    sender_id: 103,
+    receiver_id: ADMIN_ID,
+    title: 'Account password reset request',
+    message_content: 'Dear Admin, I am unable to reset my account password. The reset link seems to be expired. Can you please assist me with this issue? My username is user103.',
+    send_date: '2025-05-09',
+    read_status: 0,
   },
   {
     id: 5,
-    sender_id: 105,
-    receiver_id: 1,
-    title: 'Inquiry about bulk purchase discount',
-    message_content: 'Good day Admin, our company is interested in making a bulk purchase of your premium product. Could you please provide information on available discounts for orders over 500 units?',
-    send_date: '2025-05-10',
+    sender_id: 103,
+    receiver_id: ADMIN_ID,
+    title: 'Account password reset request',
+    message_content: 'Dear Admin, I am unable to reset my account password. The reset link seems to be expired. Can you please assist me with this issue? My username is user103.',
+    send_date: '2025-05-09',
     read_status: 0,
   },
 ];
 
 const AdminMessagePage = () => {
   const [messages, setMessages] = useState<Message[]>(mockMessages);
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [selectedMessage, setSelectedMessage] = useState<Message | AdminSentMessage | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
-  const handleViewMessage = (message: Message) => {
-    setSelectedMessage(message);
-    setIsModalVisible(true);
-    // Optionally mark as read when viewed
-    if (message.read_status === 0) {
-      toggleReadStatus(message.id);
-    }
+  const [isReplyModalVisible, setIsReplyModalVisible] = useState(false);
+  const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
+  const [adminSentMessages, setAdminSentMessages] = useState<AdminSentMessage[]>([]);
+  const [currentView, setCurrentView] = useState<'inbox' | 'sent'>('inbox'); // New state for view toggle
+
+  const handleCloseReplyModal = () => {
+    setIsReplyModalVisible(false);
+    setReplyingToMessage(null);
   };
 
-  const toggleReadStatus = (messageId: number) => {
-    setMessages(
-      messages.map((msg) =>
-        msg.id === messageId ? { ...msg, read_status: msg.read_status === 0 ? 1 : 0 } : msg
-      )
-    );
+  const handleViewChange = (e: any) => { // New handler for Radio group
+    setCurrentView(e.target.value);
   };
-
-  const columns = [
-    {
-      title: '用户ID',
-      dataIndex: 'sender_id',
-      key: 'sender_id',
-      render: (sender_id: number) => `User ${sender_id}`,
-    },
-    {
-      title: '标题',
-      dataIndex: 'title',
-      key: 'title',
-      render: (text: string, record: Message) => (
-        <span className={`${record.read_status === 0 ? 'font-bold' : ''}`}>{text}</span>
-      ),
-    },
-    {
-      title: '日期',
-      dataIndex: 'send_date',
-      key: 'send_date',
-      sorter: (a: Message, b: Message) => new Date(a.send_date).getTime() - new Date(b.send_date).getTime(),
-    },
-    {
-      title: '状态',
-      dataIndex: 'read_status',
-      key: 'read_status',
-      render: (status: 0 | 1) => (
-        <Tag color={status === 0 ? 'volcano' : 'green'}>
-          {status === 0 ? '未读' : '已读'}
-        </Tag>
-      ),
-      filters: [
-        { text: '未读', value: 0 },
-        { text: '已读', value: 1 },
-      ],
-      onFilter: (value: unknown, record: Message) => record.read_status === value,
-    },
-    {
-      title: '行动',
-      key: 'actions',
-      render: (_: any, record: Message) => (
-        <div className="space-x-2">
-          <Button
-            icon={<EyeOutlined />}
-            onClick={() => handleViewMessage(record)}
-            className="text-blue-500 border-blue-500 hover:text-blue-700 hover:border-blue-700"
-          >
-            查看
-          </Button>
-          <Button
-            icon={record.read_status === 0 ? <MailOutlined /> : <CheckCircleOutlined />}
-            onClick={() => toggleReadStatus(record.id)}
-            className={`${record.read_status === 0
-              ? 'text-orange-500 border-orange-500 hover:text-orange-700 hover:border-orange-700'
-              : 'text-green-500 border-green-500 hover:text-green-700 hover:border-green-700'
-              }`}
-          >
-            {record.read_status === 0 ? '标记已读' : '标记未读'}
-          </Button>
-        </div>
-      ),
-    },
-  ];
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <Title level={2} className="mb-6 text-gray-800">管理员消息中心</Title>
+    <div className="p-6 bg-gray-100 min-h-screen space-y-8">
+      <div className="flex justify-between items-center mb-6">
+        <Title level={2} className="text-gray-800 !mb-0">
+          {currentView === 'inbox' ? '管理员消息中心 - 收件箱' : '管理员消息中心 - 已发送'}
+        </Title>
+        <Radio.Group onChange={handleViewChange} value={currentView}>
+          <Radio.Button value="inbox">收件箱</Radio.Button>
+          <Radio.Button value="sent">已发送</Radio.Button>
+        </Radio.Group>
+      </div>
 
-      <Table
-        columns={columns}
-        dataSource={messages}
-        rowKey="id"
-        className="bg-white shadow-lg rounded-lg"
-        pagination={{ pageSize: 5 }}
-      />
+      {currentView === 'inbox' && (
+        <AdminReciveBox
+          messages={messages}
+          setMessages={setMessages}
+          setSelectedMessage={setSelectedMessage}
+          setIsModalVisible={setIsModalVisible}
+          setIsReplyModalVisible={setIsReplyModalVisible}
+          setReplyingToMessage={setReplyingToMessage}
+        />
+      )}
+
+      {currentView === 'sent' && (
+        <AdminSentBox
+          adminSentMessages={adminSentMessages}
+          setSelectedMessage={setSelectedMessage}
+          setIsMessageModalVisible={setIsModalVisible}
+        />
+      )}
+
       {selectedMessage && (
         <MessageContent
           selectedMessage={selectedMessage}
@@ -168,6 +137,18 @@ const AdminMessagePage = () => {
           setSelectedMessage={setSelectedMessage}
         />
       )}
+
+      {replyingToMessage && (
+        <AdminReplyModal
+          visible={isReplyModalVisible}
+          recipientId={replyingToMessage.sender_id}
+          originalMessageTitle={replyingToMessage.title}
+          adminSentMessages={adminSentMessages}
+          setAdminSentMessages={setAdminSentMessages}
+          handleCloseReplyModal={handleCloseReplyModal}
+        />
+      )}
+
     </div>
   );
 };

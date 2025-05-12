@@ -1,6 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 
-interface Account {
+export interface Account {
   id: number;
   username: string;
   phone?: string | null;
@@ -10,16 +10,19 @@ interface Account {
   user_type: number;
 }
 
-export const login = async (uname: string, pwd: string) => {
+export const login = async (uname: string, pwd: string): Promise<Account | null> => {
   try {
-    const account: Account | null = await invoke<Account>("login", {
+    // 后端的 "login" tauri 命令应该直接返回 Account 结构体或者在错误时抛出异常
+    const account = await invoke<Account>("login", {
       username: uname,
       password: pwd,
     });
-    return account.user_type;
+    // 如果 invoke 成功，它会返回 Account 对象
+    return account;
   } catch (error) {
-    console.error("Login failed:", error);
-    return 2;
+    // 如果 invoke 失败 (例如后端返回 Err 或 tauri 通信错误)，会进入 catch 块
+    console.error("Login API call failed:", error);
+    return null; // 返回 null 表示登录失败
   }
 };
 
@@ -39,3 +42,14 @@ export const register = async (uname: string, pwd: string, phe: string, gen: num
     return false;
   }
 };
+
+export interface MonthlyConsumptionSummary {
+  month: string; // "YYYY-MM"
+  total_amount: number;
+}
+
+export interface GoodsConsumptionShare {
+  goods_name: string;
+  amount: number;
+}
+

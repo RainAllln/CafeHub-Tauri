@@ -338,6 +338,8 @@ fn get_goods_consumption_share_current_month(
 
     let now = Local::now();
     let current_month_str = now.format("%Y-%m").to_string();
+    // ---- 添加的调试日志 ----
+    println!("[RUST DEBUG] get_goods_consumption_share_current_month: Determined current_month_str = '{}'", current_month_str);
 
     let query = "
         SELECT g.goods_name, SUM(c.amount) as consumed_amount
@@ -347,20 +349,38 @@ fn get_goods_consumption_share_current_month(
         GROUP BY g.goods_name
         ORDER BY consumed_amount DESC";
 
-    let results: Vec<GoodsConsumptionShare> = conn
+    match conn
         .exec_map(
             query,
             params! { "current_month" => &current_month_str },
-            |(goods_name, amount)| GoodsConsumptionShare { goods_name, amount },
+            |(goods_name, amount_val): (String, Decimal)| GoodsConsumptionShare { goods_name, amount: amount_val }, // 明确指定元组类型
         )
-        .map_err(|e| {
-            format!(
+    {
+        Ok(results) => {
+            // ---- 添加的调试日志 ----
+            println!("[RUST DEBUG] get_goods_consumption_share_current_month: Query successful. Results count = {}", results.len());
+            if results.is_empty() {
+                println!("[RUST DEBUG] get_goods_consumption_share_current_month: No goods consumption data found for month '{}'", current_month_str);
+            } else {
+                // (可选) 打印部分结果内容，帮助调试
+                for (index, item) in results.iter().take(3).enumerate() { // 最多打印前3条
+                    println!("[RUST DEBUG] get_goods_consumption_share_current_month: Result[{}]: Name='{}', Amount='{}'", index, item.goods_name, item.amount);
+                }
+            }
+            Ok(results)
+        }
+        Err(e) => {
+            // ---- 现有错误日志 ----
+            eprintln!(
+                "[RUST ERROR] Database query failed for current month goods consumption share (month: {}): {}",
+                current_month_str, e
+            );
+            Err(format!(
                 "Database query failed for current month goods consumption share: {}",
                 e
-            )
-        })?;
-
-    Ok(results)
+            ))
+        }
+    }
 }
 
 #[tauri::command]

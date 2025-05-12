@@ -1,63 +1,80 @@
-import { useNavigate } from "react-router-dom"
-import { Button, Image, Input, Tooltip, message } from "antd"
-import { EyeInvisibleOutlined, EyeTwoTone, InfoCircleOutlined, KeyOutlined, UserOutlined } from "@ant-design/icons"
-import bg from "@/assets/login.png"
-import { useState } from "react"
-import { login } from "@/api/user"
+// LoginPage.tsx (修正版 - 包含背景图和新的登录逻辑)
+import { useNavigate } from "react-router-dom";
+import { Button, Input, Tooltip, message } from "antd";
+import { EyeInvisibleOutlined, EyeTwoTone, InfoCircleOutlined, KeyOutlined, UserOutlined } from "@ant-design/icons";
+import bg from "@/assets/login.png"; // ****** 1. 确保导入背景图片 ******
+import { useState } from "react";
+import { login } from "@/api/user";
+import type { Account } from "@/api/user";
 
 const LoginPage = () => {
-  const navigate = useNavigate()
-
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
+  const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [messageApi, contextHolder] = message.useMessage();
 
   const handleLogin = async () => {
     try {
-      // 调用登录接口
-      let res = await login(username, password);
-      if (res != 2) {
-        // 登录成功，跳转到首页
+      const account: Account | null = await login(username, password);
+
+      if (account) {
         messageApi.open({
           type: 'success',
           content: '登录成功',
           duration: 2,
         });
-        if (res == 0) navigate('/admin');
-        if (res == 1) navigate('/customer');
+        localStorage.setItem('loginAccount', JSON.stringify(account));
+        localStorage.setItem('isAuthenticated', 'true');
+        if (account.user_type === 0) {
+            navigate('/admin');
+        } else if (account.user_type === 1) {
+            navigate('/customer');
+        } else {
+           console.error("Unknown user type:", account.user_type);
+           messageApi.open({
+               type: 'error',
+               content: '未知的用户类型',
+               duration: 2,
+           });
+        }
       } else {
-        console.log('登录失败');
+        console.log('登录失败 (API返回null或发生错误)');
         messageApi.open({
           type: 'error',
-          content: '账号或密码错误',
+          content: '账号或密码错误，或登录服务暂时不可用',
           duration: 2,
         });
+        localStorage.removeItem('loginAccount');
+        localStorage.removeItem('isAuthenticated');
       }
     } catch (error) {
-      console.error('登录接口调用失败', error);
+      console.error('登录流程中发生意外错误:', error);
       messageApi.open({
         type: 'error',
         content: '登录失败，请稍后再试',
         duration: 2,
       });
+      localStorage.removeItem('loginAccount');
+      localStorage.removeItem('isAuthenticated');
     }
-  }
+  };
 
   const onChangeUsername = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setUsername(e.target.value)
-  }
+    setUsername(e.target.value);
+  };
   const onChangePassword = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setPassword(e.target.value)
-  }
+    setPassword(e.target.value);
+  };
 
   return (
+    // ****** 2. 确保 style 属性和其中的 backgroundImage 设置被正确应用 ******
     <div className="flex flex-row min-h-screen" style={{
       backgroundImage: `url(${bg})`,
       backgroundSize: "cover",
       backgroundPosition: "center",
       backgroundRepeat: "no-repeat",
-      backgroundColor: "rgba(255, 255, 255, 0.5)", // Add a white overlay
-      backgroundBlendMode: "lighten" // Blend the overlay with the image
+      backgroundColor: "rgba(255, 255, 255, 0.5)",
+      backgroundBlendMode: "lighten"
     }}>
       <div className=" flex justify-center items-center w-full">
         <div className="flex flex-col items-center bg-opacity-90 p-8 rounded w-2/5">
@@ -88,7 +105,7 @@ const LoginPage = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default LoginPage
+export default LoginPage;

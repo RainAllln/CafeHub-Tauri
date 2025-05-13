@@ -23,6 +23,18 @@ export interface AddProductData {
   stock?: number;      // Optional, as in Rust
 }
 
+// Matches the `PurchaseItem` struct in Rust
+export interface PurchaseItemData {
+  goods_id: number; // Changed from i32 to number for TypeScript
+  quantity: number; // Changed from i32 to number for TypeScript
+}
+
+// Matches the `PurchaseGoodsData` struct in Rust
+export interface PurchaseGoodsPayload {
+  user_id: number; // Changed from i64 to number for TypeScript
+  items: PurchaseItemData[];
+}
+
 /**
  * Fetches all products from the backend.
  * @returns A promise that resolves to an array of Product objects.
@@ -101,6 +113,34 @@ export const addProduct = async (data: AddProductData): Promise<string> => {
       throw error;
     } else {
       throw new Error("An unknown error occurred while adding the product.");
+    }
+  }
+};
+
+/**
+ * Processes the purchase of goods for a user.
+ * @param payload An object containing the user_id and a list of items to purchase.
+ * @returns A promise that resolves to a number indicating the purchase status:
+ *          0: Purchase successful
+ *          1: Insufficient stock
+ *          2: Insufficient balance
+ *          Rejects with an error message for other failures.
+ */
+export const purchaseGoods = async (payload: PurchaseGoodsPayload): Promise<number> => {
+  try {
+    // The Rust command `purchase_goods` expects `data` as its argument,
+    // which corresponds to the `PurchaseGoodsData` struct.
+    const result = await invoke<number>("purchase_goods", { data: payload });
+    console.log(`Purchase goods result for user ${payload.user_id}:`, result);
+    return result;
+  } catch (error) {
+    console.error(`Failed to purchase goods for user ${payload.user_id}:`, error);
+    if (typeof error === 'string') {
+      throw new Error(error);
+    } else if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error("An unknown error occurred during the purchase process.");
     }
   }
 };

@@ -1,47 +1,84 @@
-import React, { useState } from 'react';
-import { Button, Card, Col, Row, FloatButton, Typography, Divider, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Button, Card, Col, Row, FloatButton, Typography, Divider, message, Spin } from 'antd';
 import { ShoppingCartOutlined } from '@ant-design/icons';
 import Cart from '../components/Cart';
 import ProductInfo from '@/components/ProductInfo';
+import { getProducts, Product as ApiProduct } from '@/api/product';
+import type { Account } from '@/api/user'; // Import Account type
 
-interface Product {
-  id: number;
-  name: string;
-  stock: number;
-  price: number;
-  category: string;
-}
+interface Product extends ApiProduct { }
 
 interface CartItem extends Product {
   quantity: number;
 }
 
-const initialProducts: Product[] = [
-  // 咖啡类
-  { id: 1, name: '浓缩咖啡', stock: 100, price: 15, category: '咖啡' },
-  { id: 2, name: '拿铁', stock: 80, price: 22, category: '咖啡' },
-  { id: 3, name: '卡布奇诺', stock: 70, price: 20, category: '咖啡' },
-  { id: 4, name: '美式咖啡', stock: 120, price: 18, category: '咖啡' },
-  // 非咖啡类
-  { id: 5, name: '红茶', stock: 90, price: 12, category: '非咖啡饮品' },
-  { id: 6, name: '绿茶', stock: 85, price: 10, category: '非咖啡饮品' },
-  { id: 7, name: '果汁', stock: 60, price: 18, category: '非咖啡饮品' },
-  // 烘焙食品类
-  { id: 8, name: '可颂面包', stock: 50, price: 10, category: '烘焙食品' },
-  { id: 9, name: '巧克力蛋糕', stock: 40, price: 25, category: '烘焙食品' },
-  { id: 10, name: '芝士挞', stock: 30, price: 15, category: '烘焙食品' },
-];
-
 const CustomerProductPage = () => {
-  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartDrawerVisible, setIsCartDrawerVisible] = useState(false);
+  const [userId, setUserId] = useState<number | null>(null);
+
+  // Fetch user ID from localStorage
+  useEffect(() => {
+    const storedAccountString = localStorage.getItem('loginAccount');
+    if (storedAccountString) {
+      try {
+        const storedAccount: Account = JSON.parse(storedAccountString);
+        if (storedAccount && typeof storedAccount.id === 'number') {
+          setUserId(storedAccount.id);
+        } else {
+          console.error("User ID not found or invalid in stored account data.");
+          message.error("无法获取用户信息，请重新登录。");
+          // Optionally, redirect to login page
+          // navigate('/login');
+        }
+      } catch (error) {
+        console.error("Failed to parse stored account data:", error);
+        message.error("用户信息解析失败，请重新登录。");
+        localStorage.removeItem('loginAccount'); // Clear corrupted data
+        // Optionally, redirect to login page
+      }
+    } else {
+      console.warn("No user account found in localStorage. Please login.");
+      message.error("请先登录再进行操作。");
+      // Optionally, redirect to login page
+      // navigate('/login'); // You would need to import useNavigate from 'react-router-dom'
+    }
+  }, []);
+
+
+  const fetchProducts = async () => {
+    setLoading(true);
+    try {
+      const fetchedProducts = await getProducts();
+      setProducts(fetchedProducts);
+    } catch (error) {
+      console.error("加载商品失败:", error);
+      message.error('商品加载失败，请稍后重试。');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   const addToCart = (product: Product) => {
-    if (product.stock === 0) {
+    const existingCartItem = cart.find(item => item.id === product.id);
+    const currentProductState = products.find(p => p.id === product.id);
+
+    if (!currentProductState || currentProductState.stock === 0) {
       message.warning('该商品已售罄!');
       return;
     }
+
+    if (existingCartItem && existingCartItem.quantity >= currentProductState.stock) {
+      message.warning(`库存不足，${product.goods_name} 购物车中已有 ${existingCartItem.quantity} 件!`);
+      return;
+    }
+
     setCart((prevCart) => {
       const existingItem = prevCart.find(item => item.id === product.id);
       if (existingItem) {
@@ -52,26 +89,32 @@ const CustomerProductPage = () => {
         return [...prevCart, { ...product, quantity: 1 }];
       }
     });
-    setProducts(prevProducts =>
-      prevProducts.map(p =>
-        p.id === product.id ? { ...p, stock: p.stock - 1 } : p
-      )
-    );
-    message.success(`${product.name} 已添加到购物车`);
+    message.success(`${product.goods_name} 已添加到购物车`);
   };
 
-  const categories = ['咖啡', '非咖啡饮品', '烘焙食品', '轻食简餐', '咖啡豆与周边'];
+  const uniqueCategories = Array.from(new Set(products.map(p => p.goods_type))).sort();
   const totalCartItems = cart.reduce((total, item) => total + item.quantity, 0);
+
+  if (loading && products.length === 0) { // Show loading only if products are not yet loaded
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <Spin size="large" tip="正在加载商品..." />
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '20px' }}>
       <Typography.Title level={2} style={{ textAlign: 'center', marginBottom: '30px' }}>欢迎选购</Typography.Title>
-      {categories.map(category => (
-        <div key={category} style={{ marginBottom: '30px' }}>
-          <Divider orientation="left"><Typography.Title level={3}>{category}</Typography.Title></Divider>
+      {uniqueCategories.length === 0 && !loading && (
+        <Typography.Text style={{ textAlign: 'center', display: 'block' }}>暂无商品</Typography.Text>
+      )}
+      {uniqueCategories.map(goods_type => (
+        <div key={goods_type} style={{ marginBottom: '30px' }}>
+          <Divider orientation="left"><Typography.Title level={3}>{goods_type}</Typography.Title></Divider>
           <Row gutter={[16, 16]}>
             {products
-              .filter(p => p.category === category)
+              .filter(p => p.goods_type === goods_type)
               .map(p => (
                 <Col key={p.id} xs={24} sm={12} md={8} lg={6}>
                   <ProductInfo p={p} addToCart={addToCart} />
@@ -93,9 +136,11 @@ const CustomerProductPage = () => {
         cart={cart}
         setCart={setCart}
         products={products}
-        setProducts={setProducts}
+        setProducts={setProducts} // Still needed for optimistic updates in cart quantity adjustment
         isCartDrawerVisible={isCartDrawerVisible}
         setIsCartDrawerVisible={setIsCartDrawerVisible}
+        userId={userId} // Pass the user ID
+        onPurchaseSuccess={fetchProducts} // Pass fetchProducts as callback
       />
     </div>
   );

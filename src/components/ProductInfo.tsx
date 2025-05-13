@@ -4,12 +4,12 @@ import React from 'react'
 interface ProductInfoProps {
   p: {
     id: number;
-    name: string;
+    goods_name: string;
     stock: number;
     price: number;
-    category: string;
+    goods_type: string;
   };
-  addToCart: (product: { id: number; name: string; stock: number; price: number; category: string }) => void;
+  addToCart: (product: { id: number; goods_name: string; stock: number; price: number; goods_type: string }) => void;
 }
 
 const ProductInfo: React.FC<ProductInfoProps> = ({ p, addToCart }) => {
@@ -17,7 +17,7 @@ const ProductInfo: React.FC<ProductInfoProps> = ({ p, addToCart }) => {
     <>
       <Card
         hoverable
-        title={p.name}
+        title={p.goods_name}
         actions={[
           <Button
             type="primary"
@@ -30,7 +30,7 @@ const ProductInfo: React.FC<ProductInfoProps> = ({ p, addToCart }) => {
         ]}
       >
         <Card.Meta
-          description={`价格: ¥${p.price.toFixed(2)}`}
+          description={`价格: ¥${p.price}`}
         />
         <Typography.Text type={p.stock === 0 ? "danger" : "secondary"} style={{ display: 'block', marginTop: '8px' }}>
           库存: {p.stock}

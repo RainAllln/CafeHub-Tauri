@@ -793,7 +793,7 @@ fn recharge_balance(data: RechargeBalanceData, mysql_pool: State<Pool>) -> Resul
 }
 
 #[tauri::command]
-fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<String, String> {
+fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<i32, String> {
     if data.items.is_empty() {
         return Err("No items provided for purchase.".to_string());
     }
@@ -843,10 +843,8 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<St
         };
 
         if current_stock < item.quantity {
-            return Err(format!(
-                "Insufficient stock for goods ID {}. Available: {}, Requested: {}.",
-                item.goods_id, current_stock, item.quantity
-            ));
+            // Insufficient stock
+            return Ok(1);
         }
 
         let item_total_price = price_per_item * Decimal::from(item.quantity);
@@ -879,10 +877,8 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<St
     };
 
     if current_balance < total_purchase_price {
-        return Err(format!(
-            "Insufficient balance for user ID {}. Required: {}, Available: {}.",
-            data.user_id, total_purchase_price, current_balance
-        ));
+        // Insufficient balance
+        return Ok(2);
     }
 
     // 3. Update goods stock for each item
@@ -932,12 +928,8 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<St
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
-    Ok(format!(
-        "Purchase of {} item type(s) successful. Total cost: {}. Remaining balance: {}.",
-        processed_item_details.len(),
-        total_purchase_price,
-        current_balance - total_purchase_price
-    ))
+    // Purchase successful
+    Ok(0)
 }
 
 #[tauri::command]

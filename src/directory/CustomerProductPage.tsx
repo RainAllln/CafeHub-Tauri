@@ -23,9 +23,9 @@ const initialProducts: Product[] = [
   { id: 3, name: '卡布奇诺', stock: 70, price: 20, category: '咖啡' },
   { id: 4, name: '美式咖啡', stock: 120, price: 18, category: '咖啡' },
   // 非咖啡类
-  { id: 5, name: '红茶', stock: 90, price: 12, category: '非咖啡' },
-  { id: 6, name: '绿茶', stock: 85, price: 10, category: '非咖啡' },
-  { id: 7, name: '果汁', stock: 60, price: 18, category: '非咖啡' },
+  { id: 5, name: '红茶', stock: 90, price: 12, category: '非咖啡饮品' },
+  { id: 6, name: '绿茶', stock: 85, price: 10, category: '非咖啡饮品' },
+  { id: 7, name: '果汁', stock: 60, price: 18, category: '非咖啡饮品' },
   // 烘焙食品类
   { id: 8, name: '可颂面包', stock: 50, price: 10, category: '烘焙食品' },
   { id: 9, name: '巧克力蛋糕', stock: 40, price: 25, category: '烘焙食品' },
@@ -60,7 +60,7 @@ const CustomerProductPage = () => {
     message.success(`${product.name} 已添加到购物车`);
   };
 
-  const categories = ['咖啡', '非咖啡', '烘焙食品'];
+  const categories = ['咖啡', '非咖啡饮品', '烘焙食品', '轻食简餐', '咖啡豆与周边'];
   const totalCartItems = cart.reduce((total, item) => total + item.quantity, 0);
 
   return (

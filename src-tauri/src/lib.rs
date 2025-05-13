@@ -47,6 +47,15 @@ struct UpdatePasswordData {
     new_password: String,
 }
 
+#[derive(Serialize, Deserialize, Clone)]
+struct Goods {
+    id: i32,
+    goods_name: String,
+    goods_type: Option<String>,
+    price: Decimal,
+    stock: Option<i32>,
+}
+
 #[derive(Deserialize)]
 struct AddGoodsData {
     goods_name: String,
@@ -349,13 +358,14 @@ fn get_goods_consumption_share_current_month(
         GROUP BY g.goods_name
         ORDER BY consumed_amount DESC";
 
-    match conn
-        .exec_map(
-            query,
-            params! { "current_month" => &current_month_str },
-            |(goods_name, amount_val): (String, Decimal)| GoodsConsumptionShare { goods_name, amount: amount_val }, // 明确指定元组类型
-        )
-    {
+    match conn.exec_map(
+        query,
+        params! { "current_month" => &current_month_str },
+        |(goods_name, amount_val): (String, Decimal)| GoodsConsumptionShare {
+            goods_name,
+            amount: amount_val,
+        }, // 明确指定元组类型
+    ) {
         Ok(results) => {
             // ---- 添加的调试日志 ----
             println!("[RUST DEBUG] get_goods_consumption_share_current_month: Query successful. Results count = {}", results.len());
@@ -363,7 +373,8 @@ fn get_goods_consumption_share_current_month(
                 println!("[RUST DEBUG] get_goods_consumption_share_current_month: No goods consumption data found for month '{}'", current_month_str);
             } else {
                 // (可选) 打印部分结果内容，帮助调试
-                for (index, item) in results.iter().take(3).enumerate() { // 最多打印前3条
+                for (index, item) in results.iter().take(3).enumerate() {
+                    // 最多打印前3条
                     println!("[RUST DEBUG] get_goods_consumption_share_current_month: Result[{}]: Name='{}', Amount='{}'", index, item.goods_name, item.amount);
                 }
             }
@@ -573,6 +584,36 @@ fn update_user_password(
             Err(format!("Database password update failed: {}", e))
         }
     }
+}
+
+#[tauri::command]
+fn get_all_goods(mysql_pool: State<Pool>) -> Result<Vec<Goods>, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let query = "SELECT id, goods_name, goods_type, price, stock FROM goods";
+
+    let results: Vec<Goods> = conn
+        .query_map(query, |(id, goods_name, goods_type, price, stock)| Goods {
+            id,
+            goods_name,
+            goods_type,
+            price,
+            stock,
+        }).map(|items| {
+            println!("[RUST DEBUG] get_all_goods: Query successful. Fetched {} goods items.", items.len());
+            for (index, item) in items.iter().enumerate() {
+            println!(
+                "[RUST DEBUG] get_all_goods: Item[{}]: ID={}, Name='{}', Type='{:?}', Price={}, Stock={:?}",
+                index, item.id, &item.goods_name, &item.goods_type, &item.price, &item.stock
+            );
+            }
+            items // Pass items through for further processing
+        })
+        .map_err(|e| format!("Database query failed for all goods: {}", e))?;
+
+    Ok(results)
 }
 
 #[tauri::command]
@@ -1245,6 +1286,7 @@ pub fn run() {
             get_user_monthly_consumption,
             update_user_details,
             update_user_password,
+            get_all_goods,
             add_goods,
             update_goods_info,
             purchase_goods,

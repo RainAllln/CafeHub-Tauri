@@ -94,7 +94,9 @@ struct LostItem {
     item_name: String,
     pick_place: Option<String>,
     pick_user_id: Option<i64>,
+    pick_user_name: Option<String>, // Added
     claim_user_id: Option<i64>,
+    claim_user_name: Option<String>, // Added
     pick_time: Option<NaiveDate>,
     claim_time: Option<NaiveDate>,
     status: i8, // 0: Unclaimed, 1: Claimed
@@ -938,7 +940,28 @@ fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, String> 
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    let query = "SELECT id, item_name, pick_place, pick_user_id, claim_user_id, pick_time, claim_time, status FROM lost_items ORDER BY pick_time DESC, id DESC";
+    // Updated query to join with account table for picker and claimer usernames
+    let query = "
+        SELECT
+            li.id,
+            li.item_name,
+            li.pick_place,
+            li.pick_user_id,
+            p_acc.username AS pick_user_name,
+            li.claim_user_id,
+            c_acc.username AS claim_user_name,
+            li.pick_time,
+            li.claim_time,
+            li.status
+        FROM
+            lost_items li
+        LEFT JOIN
+            account p_acc ON li.pick_user_id = p_acc.id
+        LEFT JOIN
+            account c_acc ON li.claim_user_id = c_acc.id
+        ORDER BY
+            li.pick_time DESC, li.id DESC;
+    ";
 
     let results: Vec<LostItem> = conn
         .query_map(
@@ -948,7 +971,9 @@ fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, String> 
                 item_name,
                 pick_place,
                 pick_user_id,
+                pick_user_name, // Added
                 claim_user_id,
+                claim_user_name, // Added
                 pick_time,
                 claim_time,
                 status,
@@ -958,14 +983,16 @@ fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, String> 
                     item_name,
                     pick_place,
                     pick_user_id,
+                    pick_user_name, // Added
                     claim_user_id,
+                    claim_user_name, // Added
                     pick_time,
                     claim_time,
                     status,
                 }
             },
         )
-        .map_err(|e| format!("Database query failed for lost items: {}", e))?;
+        .map_err(|e| format!("Database query failed for all lost items: {}", e))?;
 
     Ok(results)
 }

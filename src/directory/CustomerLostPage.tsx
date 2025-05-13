@@ -1,122 +1,128 @@
-import React, { useState } from 'react';
-import { Table, Button, Tag, Space, Modal, Form, Input, DatePicker } from 'antd'; // 导入 Ant Design 组件
+import React, { useEffect, useState } from 'react';
+import { Table, Button, Tag, Space, message } from 'antd';
 import type { TableProps } from 'antd';
-import type { Dayjs } from 'dayjs'; // 导入 Dayjs 类型
 import ReportLost from '@/components/ReportLost';
+import { getAllLostItems, LostItem as ApiLostItem } from '../api/lost';
+import { invoke } from '@tauri-apps/api/core';
+import type { Account } from '../api/user'; // Added import for Account type
 
-// 定义失物信息的类型接口
-interface LostItem {
-  id: number;
-  itemName: string;        // 物品名
-  pickPlace: string;       // 拾取地点
-  pickTime: string;        // 拾取时间 (格式 YYYY-MM-DD)
-  pickerUsername: string;  // 拾取用户名
-  pickerPhone: string;     // 拾取用户联系电话
-  isClaimed: boolean;      // 是否已认领
-}
-
-// 模拟失物数据
-const mockLostItemsData: LostItem[] = [
-  {
-    id: 1,
-    itemName: "笔记本",
-    pickPlace: "2号桌",
-    pickTime: "2025-05-01",
-    pickerUsername: "热心员工小张",
-    pickerPhone: "13800138000",
-    isClaimed: false,
-  },
-  {
-    id: 2,
-    itemName: "黑色雨伞",
-    pickPlace: "门口伞桶",
-    pickTime: "2025-05-03",
-    pickerUsername: "顾客李女士",
-    pickerPhone: "13912345678",
-    isClaimed: false,
-  },
-  {
-    id: 3,
-    itemName: "蓝牙耳机",
-    pickPlace: "吧台角落",
-    pickTime: "2025-05-05",
-    pickerUsername: "咖啡师阿明",
-    pickerPhone: "13777777777",
-    isClaimed: true,
-  },
-  {
-    id: 4,
-    itemName: "学生证",
-    pickPlace: "沙发区",
-    pickTime: "2025-05-08",
-    pickerUsername: "值班经理",
-    pickerPhone: "13600000000",
-    isClaimed: false,
-  },
-];
+// Helper function to get user ID - updated based on CustomerInfoPage.tsx
+const getLoggedInUser = (): number | null => {
+  const accountDataString = localStorage.getItem('loginAccount'); // Changed key to 'loginAccount'
+  if (accountDataString) {
+    try {
+      const account: Account = JSON.parse(accountDataString);
+      return account && typeof account.id === 'number' ? account.id : null;
+    } catch (e) {
+      console.error("Failed to parse account data from localStorage", e);
+      return null;
+    }
+  }
+  return null;
+};
 
 const CustomerLostPage = () => {
-  const [lostItems, setLostItems] = useState<LostItem[]>(mockLostItemsData);
+  const [lostItems, setLostItems] = useState<ApiLostItem[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const userId = getLoggedInUser();
+    setCurrentUserId(userId);
+    if (userId === null) {
+      message.warning('请先登录以执行操作。'); // Changed from message.warn to message.warning
+    }
+  }, []);
+
+  const fetchLostItems = async () => {
+    try {
+      setLoading(true);
+      const items = await getAllLostItems();
+      setLostItems(items);
+      setError(null);
+    } catch (err) {
+      console.error("Failed to fetch lost items:", err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      setLostItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLostItems();
+  }, []);
 
   const handleReportLostItem = () => {
+    if (currentUserId === null) {
+      message.error('请先登录才能报告失物。');
+      return;
+    }
     setIsModalOpen(true);
   };
 
-  const handleClaimItem = (itemId: number) => {
-    // TODO: 实现认领物品逻辑
-    setLostItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, isClaimed: true } : item
-      )
-    );
-    alert(`认领物品 ${itemId} 功能待实现`);
+  const handleClaimItem = async (itemId: number) => {
+    if (currentUserId === null) {
+      message.error('请先登录才能认领物品。');
+      return;
+    }
+    try {
+      await invoke('claim_lost_item', { data: { item_id: itemId, claim_user_id: currentUserId } });
+      message.success('物品认领成功！请等待管理员确认。');
+      fetchLostItems();
+    } catch (err) {
+      console.error("Failed to claim item:", err);
+      message.error(err instanceof Error ? err.message : '认领失败，请重试');
+    }
   };
 
-  // Ant Design Table 的列定义
-  const columns: TableProps<LostItem>['columns'] = [
+  const columns: TableProps<ApiLostItem>['columns'] = [
     {
       title: '物品名称',
-      dataIndex: 'itemName',
-      key: 'itemName',
+      dataIndex: 'item_name',
+      key: 'item_name',
     },
     {
       title: '拾取地点',
-      dataIndex: 'pickPlace',
-      key: 'pickPlace',
+      dataIndex: 'pick_place',
+      key: 'pick_place',
+      render: (text?: string) => text || 'N/A',
     },
     {
       title: '拾取时间',
-      dataIndex: 'pickTime',
-      key: 'pickTime',
+      dataIndex: 'pick_time',
+      key: 'pick_time',
+      render: (text?: string) => text ? new Date(text).toLocaleDateString() : 'N/A',
     },
     {
       title: '拾取人',
-      dataIndex: 'pickerUsername',
-      key: 'pickerUsername',
-    },
-    {
-      title: '联系电话',
-      dataIndex: 'pickerPhone',
-      key: 'pickerPhone',
+      dataIndex: 'pick_user_name',
+      key: 'pick_user_name',
+      render: (text?: string) => text || 'N/A',
     },
     {
       title: '状态',
       key: 'status',
-      dataIndex: 'isClaimed',
-      render: (isClaimed: boolean) => (
-        <Tag color={isClaimed ? 'red' : 'green'}>
-          {isClaimed ? '已认领' : '未认领'}
+      dataIndex: 'status',
+      render: (status: 0 | 1) => (
+        <Tag color={status === 0 ? 'green' : 'red'}>
+          {status === 0 ? '未认领' : '已认领'}
         </Tag>
       ),
     },
     {
       title: '操作',
       key: 'action',
-      render: (_, record) => (
+      render: (_, record: ApiLostItem) => (
         <Space size="middle">
-          {!record.isClaimed ? (
-            <Button type="primary" onClick={() => handleClaimItem(record.id)}>
+          {record.status === 0 ? (
+            <Button
+              type="primary"
+              onClick={() => handleClaimItem(record.id)}
+              disabled={currentUserId === null}
+            >
               认领
             </Button>
           ) : (
@@ -129,11 +135,19 @@ const CustomerLostPage = () => {
     },
   ];
 
+  if (error) {
+    return <div className="p-5 font-sans text-center text-red-500">加载失物列表失败: {error}</div>;
+  }
+
   return (
     <div className="p-5 font-sans">
       <div className="flex justify-between items-center mb-5">
         <h1 className="text-2xl">失物招领</h1>
-        <Button type="primary" onClick={handleReportLostItem}>
+        <Button
+          type="primary"
+          onClick={handleReportLostItem}
+          disabled={currentUserId === null}
+        >
           报告失物
         </Button>
       </div>
@@ -141,15 +155,18 @@ const CustomerLostPage = () => {
         columns={columns}
         dataSource={lostItems}
         rowKey="id"
-        pagination={{ pageSize: 4 }}
+        loading={loading}
+        pagination={{ pageSize: 10 }}
       />
 
-      <ReportLost
-        isModalOpen={isModalOpen}
-        setIsModalOpen={setIsModalOpen}
-        lostItems={lostItems}
-        setLostItems={setLostItems}
-      />
+      {currentUserId !== null && (
+        <ReportLost
+          isModalOpen={isModalOpen}
+          setIsModalOpen={setIsModalOpen}
+          onReportSuccess={fetchLostItems}
+          currentUserId={currentUserId}
+        />
+      )}
     </div>
   );
 };

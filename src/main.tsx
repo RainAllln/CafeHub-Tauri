@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { RouterProvider } from 'react-router'
 import router from "@/router";
 import '@/App.css'
+import '@ant-design/v5-patch-for-react-19';
 
 // remember the naming convention camelcase, it always started with variable in lowercase, next word with capital
 // app.tsx deprecated, bcs of the main is not currently being used as the main container for all the apps

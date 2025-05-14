@@ -1,11 +1,13 @@
 // src/directory/CustomerInfoPage.tsx
-import React, { useState, useEffect, useCallback } from 'react'; // 添加 useCallback
+import React, { useState, useEffect, useCallback } from 'react';
 import { invoke } from '@tauri-apps/api/core';
-import { Col, Row, Typography, Spin, Alert, message } from 'antd'; // 添加 message
+import { Col, Row, Typography, Spin, Alert, Button, Space, Divider } from 'antd'; // 添加 Button, Space, Divider
 import CustomerBasicInfoCard from '@/components/CustomerBasicInfoCard';
 import CustomerBalanceCard from '@/components/CustomerBalanceCard';
 import CustomerConsumptionChart from '@/components/CustomerConsumptionChart';
-import CustomerRechargeCard from '@/components/CustomerRechargeCard'; // 引入新的充值组件
+import CustomerRechargeCard from '@/components/CustomerRechargeCard';
+import CustomerEditProfileModal from '@/components/CustomerEditProfileModal'; // 引入新组件
+import CustomerChangePasswordModal from '@/components/CustomerChangePasswordModal'; // 引入新组件
 import type { Account, MonthlyConsumptionSummary } from '@/api/user';
 
 const { Title } = Typography;
@@ -16,14 +18,15 @@ const CustomerInfoPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // 将数据获取逻辑封装成一个函数，方便复用
+  const [isEditProfileModalVisible, setIsEditProfileModalVisible] = useState(false);
+  const [isChangePasswordModalVisible, setIsChangePasswordModalVisible] = useState(false);
+
   const fetchCustomerData = useCallback(async (showLoadingSpinner = true) => {
     if (showLoadingSpinner) {
       setLoading(true);
     }
     setError(null);
-    console.log("--- CustomerInfoPage: fetchCustomerData started ---");
-
+    // ... (fetchCustomerData 函数体与之前相同)
     try {
       const storedAccountString = localStorage.getItem('loginAccount');
       if (!storedAccountString) {
@@ -45,7 +48,7 @@ const CustomerInfoPage: React.FC = () => {
       console.log("CustomerInfoPage: Raw detailsData from backend:", JSON.stringify(detailsData, null, 2));
       console.log("CustomerInfoPage: Raw consumptionData from backend:", JSON.stringify(consumptionData, null, 2));
 
-      setAccount(detailsData); // 更新账户信息，包括余额
+      setAccount(detailsData);
       setMonthlyConsumption(
         consumptionData.map(item => ({
           ...item,
@@ -66,29 +69,28 @@ const CustomerInfoPage: React.FC = () => {
       if (showLoadingSpinner) {
         setLoading(false);
       }
-      console.log("--- CustomerInfoPage: fetchCustomerData finished ---");
     }
-  }, []); // useCallback 的依赖项为空，表示此函数本身不会因 props 或 state 变化而重新创建
+  }, []);
 
   useEffect(() => {
-    fetchCustomerData(); // 初始加载数据
-  }, [fetchCustomerData]); // 当 fetchCustomerData 函数引用改变时（理论上这里不会，因为依赖为空）
+    fetchCustomerData();
+  }, [fetchCustomerData]);
 
-  const handleRechargeSuccess = async (estimatedNewBalance: number) => {
-    // 充值成功后，重新获取用户数据以确保余额是最新的
-    message.info('正在刷新账户信息...');
-    // 为了更平滑的体验，可以先乐观更新余额显示，然后后台刷新
-    // setAccount(prev => prev ? {...prev, balance: estimatedNewBalance} : null);
-    await fetchCustomerData(false); // 重新获取数据，但不显示全局 loading spinner
-    message.success('账户信息已更新！');
+  const handleRechargeSuccess = async () => { // 移除了 estimatedNewBalance 参数
+    await fetchCustomerData(false); // 充值成功后重新获取数据
   };
 
+  const handleProfileUpdateSuccess = () => {
+    fetchCustomerData(false); // 个人资料更新成功后重新获取数据
+  };
 
   if (loading) {
+    // ... (loading state UI)
     return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}><Spin size="large" /></div>;
   }
 
   if (error) {
+    // ... (error state UI)
     return (
       <div style={{ padding: '24px' }}>
         <Alert message="错误" description={error} type="error" showIcon />
@@ -97,6 +99,7 @@ const CustomerInfoPage: React.FC = () => {
   }
 
   if (!account) {
+    // ... (no account state UI)
     return (
         <div style={{ padding: '24px' }}>
             <Alert message="提示" description="无法加载账户信息，可能需要重新登录。" type="warning" showIcon />
@@ -107,10 +110,18 @@ const CustomerInfoPage: React.FC = () => {
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>
       <Title level={2} style={{ marginBottom: '24px', textAlign: 'center' }}>我的信息</Title>
-      <Row gutter={[16, 24]}> {/* 增加了垂直间距 */}
+
+      {/* 操作按钮区域 */}
+      <Space style={{ marginBottom: '24px' }}>
+        <Button onClick={() => setIsEditProfileModalVisible(true)}>修改资料</Button>
+        <Button onClick={() => setIsChangePasswordModalVisible(true)}>修改密码</Button>
+      </Space>
+      <Divider />
+
+      <Row gutter={[16, 24]}>
         <Col xs={24} md={12}>
           <CustomerBasicInfoCard account={account} />
-          <CustomerRechargeCard // 新增的充值卡片
+          <CustomerRechargeCard
             userId={account.id}
             currentBalance={account.balance}
             onRechargeSuccess={handleRechargeSuccess}
@@ -121,6 +132,22 @@ const CustomerInfoPage: React.FC = () => {
           <CustomerConsumptionChart data={monthlyConsumption} />
         </Col>
       </Row>
+
+      {/* 弹窗组件 */}
+      <CustomerEditProfileModal
+        visible={isEditProfileModalVisible}
+        onCancel={() => setIsEditProfileModalVisible(false)}
+        onProfileUpdateSuccess={() => {
+          setIsEditProfileModalVisible(false);
+          handleProfileUpdateSuccess();
+        }}
+        currentUser={account}
+      />
+      <CustomerChangePasswordModal
+        visible={isChangePasswordModalVisible}
+        onCancel={() => setIsChangePasswordModalVisible(false)}
+        userId={account.id}
+      />
     </div>
   );
 };

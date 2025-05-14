@@ -37,6 +37,7 @@ struct GoodsConsumptionShare {
 
 #[derive(Deserialize)]
 struct UpdateUserData {
+    username: Option<String>, 
     phone: Option<String>,
     gender: Option<i8>,
 }
@@ -474,50 +475,107 @@ fn update_user_details(
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
     let mut set_clauses: Vec<String> = Vec::new();
-    let mut query_params: Vec<(String, mysql::Value)> = Vec::new();
+    // 改回使用 Vec<(String, mysql::Value)> 来收集参数
+    let mut query_params_vec: Vec<(String, mysql::Value)> = Vec::new();
 
-    if let Some(phone_val) = &data.phone {
-        if !phone_val.chars().all(|c| c.is_ascii_digit()) || phone_val.len() != 11 {
-            return Err("Invalid phone number format. Must be 11 digits.".to_string());
+    if let Some(uname_val) = &data.username {
+        if uname_val.is_empty() {
+            return Err("Username cannot be empty.".to_string());
         }
-        set_clauses.push("phone = :phone".to_string());
-        query_params.push(("phone".to_string(), phone_val.clone().into()));
+
+        let current_username_check: Option<String> = conn.exec_first(
+            "SELECT username FROM account WHERE id = :user_id",
+            params! { "user_id" => user_id }
+        ).map_err(|e| format!("DB error checking current username: {}", e))?;
+
+        let is_changing_username = match current_username_check {
+            Some(ref current_uname) => current_uname != uname_val,
+            None => true,
+        };
+
+        if is_changing_username {
+            let existing_user: Option<i64> = conn.exec_first(
+                "SELECT id FROM account WHERE username = :username AND id != :user_id_to_exclude",
+                params! { "username" => uname_val, "user_id_to_exclude" => user_id }
+            ).map_err(|e| format!("DB error checking username uniqueness: {}", e))?;
+
+            if existing_user.is_some() {
+                return Err(format!("Username '{}' is already taken.", uname_val));
+            }
+            set_clauses.push("username = :username".to_string());
+            query_params_vec.push(("username".to_string(), uname_val.clone().into()));
+        }
     }
 
-    if let Some(gender_val) = data.gender {
-        if gender_val != 0 && gender_val != 1 {
+    if let Some(phone_val) = &data.phone { // 前端会传来 Some("") 或 Some("有效号码") 或 Some(null) -> Option<String>
+        if phone_val.is_empty() { // 用户意图清空手机号
+            set_clauses.push("phone = NULL".to_string());
+            // 不需要向 query_params_vec 添加，因为 NULL 直接在 SQL 语句中
+        } else { // 用户输入了非空手机号
+            if !phone_val.chars().all(|c| c.is_ascii_digit()) || phone_val.len() != 11 {
+                return Err("Invalid phone number format. Must be 11 digits.".to_string());
+            }
+            set_clauses.push("phone = :phone".to_string());
+            query_params_vec.push(("phone".to_string(), phone_val.clone().into()));
+        }
+    }
+    // 如果 data.phone 是 None (前端根本没传这个字段)，则不处理 phone 的更新
+
+
+    if let Some(gender_val) = data.gender { // 前端传来 Some(0), Some(1), 或 Some(null) -> Option<i8>
+        if gender_val == 0 || gender_val == 1 {
+            set_clauses.push("gender = :gender".to_string());
+            query_params_vec.push(("gender".to_string(), gender_val.into()));
+        } else {
+            // 如果 gender_val 是其他值 (例如前端传了 null，但 Rust Option<i8> 接收 null 会是 None)
+            // 或者如果前端能传一个非 0 或 1 的 i8 值 (例如 -1 表示清除)
+            // 这里需要根据业务逻辑决定如何处理。
+            // 假设如果不是 0 或 1，则视为不更新或设为 NULL (如果数据库允许)
+            // 但你的数据库 CHECK (gender IN (0,1)) 不允许 NULL。
+            // 所以，如果前端 payload 中 gender 不是 0 或 1，就不应该包含 gender 字段。
+            // 我们依赖前端的 payload 构建逻辑：只有当值改变且有效时才加入。
+            // 但如果前端传了 Some(null) 而不是不传 gender，这里需要处理。
+            // 简单起见，如果不是 0 或 1，我们就不更新性别。
+            // 或者，如果业务允许清除性别且数据库允许 gender 为 NULL（并移除CHECK约束对NULL的限制）：
+            // set_clauses.push("gender = NULL".to_string());
             return Err("Invalid gender value. Must be 0 (Male) or 1 (Female).".to_string());
         }
-        set_clauses.push("gender = :gender".to_string());
-        query_params.push(("gender".to_string(), gender_val.into()));
     }
+    // 如果 data.gender 是 None，则不处理 gender 的更新
 
     if set_clauses.is_empty() {
-        return Ok("No details provided to update.".to_string());
+        return Ok("No details provided to update or values are the same.".to_string());
     }
 
-    query_params.push(("user_id".to_string(), user_id.into()));
+    // 为 user_id 添加到参数列表，因为它在 WHERE 子句中
+    query_params_vec.push(("user_id".to_string(), user_id.into()));
+    let params_for_exec = mysql::Params::from(query_params_vec);
 
-    let query = format!(
+    let query_string = format!(
         "UPDATE account SET {} WHERE id = :user_id AND user_type = 1",
         set_clauses.join(", ")
     );
 
-    match conn.exec_drop(&query, mysql::Params::from(query_params)) {
+    match conn.exec_drop(&query_string, params_for_exec) {
         Ok(_) => {
-            // Check if any rows were affected to confirm the user exists and is a customer
             if conn.affected_rows() > 0 {
                 Ok("User details updated successfully.".to_string())
             } else {
-                Err("User not found, not a customer, or no changes made.".to_string())
+                Ok("No changes made to user details (user not found, not a customer, or new values match old values).".to_string())
             }
         }
         Err(e) => {
             eprintln!("Database update failed for user ID {}: {}", user_id, e);
+            if let MySQLError::MySqlError(ref mysql_err) = e {
+                if mysql_err.code == 1062 {
+                    return Err("Update failed: Username or Phone number might already be in use by another account.".to_string());
+                }
+            }
             Err(format!("Database update failed: {}", e))
         }
     }
 }
+
 
 #[tauri::command]
 fn update_user_password(

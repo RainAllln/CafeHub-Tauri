@@ -1,5 +1,6 @@
+import { markMessageAsReadApi } from '@/api/message';
 import { EyeOutlined, SendOutlined } from '@ant-design/icons';
-import { Button, Table, Tag } from 'antd'
+import { Button, Table, Tag, message } from 'antd'
 import React from 'react'
 
 interface Message {
@@ -21,6 +22,7 @@ interface AdminReciveBoxProps {
   setIsModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setIsReplyModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setReplyingToMessage: React.Dispatch<React.SetStateAction<Message | null>>;
+  adminId: number;
   loading: boolean;
 }
 
@@ -32,20 +34,40 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
     setIsModalVisible,
     setIsReplyModalVisible,
     setReplyingToMessage,
+    adminId,
     loading,
   }
 ) => {
 
-  const handleViewMessage = (message: Message) => {
-    setSelectedMessage(message);
+  const handleViewMessage = async (messageToView: Message) => {
+    setSelectedMessage(messageToView);
     setIsModalVisible(true);
-    if (message.read_status === 0) {
-      // Mark as read when viewed
-      setMessages(
-        messages.map((msg) =>
-          msg.id === message.id ? { ...msg, read_status: 1 } : msg
-        )
-      );
+
+    // Only attempt to mark as read if it's currently unread
+    if (messageToView.read_status === 0) {
+      try {
+        const status = await markMessageAsReadApi(messageToView.id, adminId);
+        if (status === 0) {
+          // Successfully marked as read (or was already read)
+          setMessages(prevMessages =>
+            prevMessages.map(msg =>
+              msg.id === messageToView.id ? { ...msg, read_status: 1 } : msg
+            )
+          );
+          // AntMessage.success('消息已标记为已读'); // Optional: can be too noisy
+        } else if (status === 1) {
+          // This case should ideally not happen if adminId is correctly the receiver.
+          // Logging it for debugging.
+          console.warn(`Attempted to mark message ${messageToView.id} as read, but admin ${adminId} is not the receiver.`);
+          message.error('无法将此消息标记为已读：权限不足。');
+        } else {
+          // Handle other unexpected status codes if any are defined in the future
+          message.error(`标记已读时发生未知状态: ${status}`);
+        }
+      } catch (error: any) {
+        console.error(`Failed to mark message ${messageToView.id} as read:`, error);
+        message.error(error.message || '标记已读失败，请稍后重试。');
+      }
     }
   };
 

@@ -56,8 +56,8 @@ const MessageContent: React.FC<MessageContentProps> = ({ selectedMessage, isModa
         width={600}
       >
         <div className="space-y-3">
-          <Paragraph><strong className="text-gray-700">From:</strong> 用户 {selectedMessage.sender_id}</Paragraph>
-          <Paragraph><strong className="text-gray-700">To:</strong> 用户 {selectedMessage.receiver_id}</Paragraph>
+          <Paragraph><strong className="text-gray-700">From:</strong> {selectedMessage.sender_username}</Paragraph>
+          <Paragraph><strong className="text-gray-700">To:</strong> {selectedMessage.receiver_username}</Paragraph>
           <Paragraph><strong className="text-gray-700">Date:</strong> {selectedMessage.send_date}</Paragraph>
           <Paragraph className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
             {selectedMessage.message_content}

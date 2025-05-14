@@ -1270,39 +1270,94 @@ fn mark_message_as_read(
     data: MarkReadData,
     current_user_id: i64, // ID of the user performing the action (should be the receiver)
     mysql_pool: State<Pool>,
-) -> Result<String, String> {
+) -> Result<i32, String> {
+    // Changed return type
     let mut conn = mysql_pool
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    let result = conn.exec_drop(
-        "UPDATE message SET read_status = 1 WHERE id = :message_id AND receiver_id = :receiver_id AND read_status = 0",
-        params! {
-            "message_id" => data.message_id,
-            "receiver_id" => current_user_id,
-        }
+    // Step 1: Query the message to check its current state and receiver
+    let query_result: Result<Option<(i64, i8)>, mysql::Error> = conn.exec_first(
+        "SELECT receiver_id, read_status FROM message WHERE id = :message_id",
+        params! { "message_id" => data.message_id },
     );
 
-    match result {
-        Ok(_) => {
-            if conn.affected_rows() > 0 {
+    match query_result {
+        Ok(Some((receiver_id_db, read_status_db))) => {
+            // Message found, check conditions
+            if receiver_id_db != current_user_id {
+                // Current user is not the receiver
                 println!(
-                    "Message ID {} marked as read by user ID {}.",
+                    "User ID {} attempted to mark message ID {} as read, but is not the receiver (receiver ID {}).",
+                    current_user_id, data.message_id, receiver_id_db
+                );
+                return Ok(1);
+            }
+
+            if read_status_db == 1 {
+                // Message already read by the receiver
+                println!(
+                    "Message ID {} was already read by user ID {}.",
                     data.message_id, current_user_id
                 );
-                Ok(format!("Message ID {} marked as read.", data.message_id))
-            } else {
-                // Could be that message doesn't exist, user is not receiver, or already read
-                Err(format!("Failed to mark message ID {} as read. It might not exist, you might not be the receiver, or it was already read.", data.message_id))
+                return Ok(0);
+            }
+
+            // At this point, message exists, current_user is the receiver, and message is unread.
+            // Proceed to update.
+            let update_result = conn.exec_drop(
+                "UPDATE message SET read_status = 1 WHERE id = :message_id AND receiver_id = :receiver_id",
+                params! {
+                    "message_id" => data.message_id,
+                    "receiver_id" => current_user_id,
+                }
+            );
+
+            match update_result {
+                Ok(_) => {
+                    if conn.affected_rows() > 0 {
+                        println!(
+                            "Message ID {} marked as read by user ID {}.",
+                            data.message_id, current_user_id
+                        );
+                        Ok(0) // Successfully marked as read
+                    } else {
+                        // This case implies the message state changed concurrently (e.g., deleted)
+                        // between the SELECT and UPDATE, or an unexpected issue.
+                        eprintln!(
+                            "Failed to mark message ID {} as read for user ID {}: 0 rows affected despite prior checks.",
+                            data.message_id, current_user_id
+                        );
+                        Err(format!(
+                            "Failed to mark message ID {} as read. The message state might have changed concurrently or an unexpected issue occurred.",
+                            data.message_id
+                        ))
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Database update failed for marking message read (ID {}): {}",
+                        data.message_id, e
+                    );
+                    Err(format!(
+                        "Database error while marking message as read: {}",
+                        e
+                    ))
+                }
             }
         }
+        Ok(None) => {
+            // Message not found
+            Err(format!("Message with ID {} not found.", data.message_id))
+        }
         Err(e) => {
+            // Error during the initial query
             eprintln!(
-                "Database update failed for marking message read (ID {}): {}",
+                "Database query failed for message details (ID {}): {}",
                 data.message_id, e
             );
             Err(format!(
-                "Database error while marking message as read: {}",
+                "Database query failed to retrieve message details: {}",
                 e
             ))
         }

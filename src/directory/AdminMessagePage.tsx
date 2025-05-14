@@ -5,6 +5,7 @@ import AdminReplyModal from '@/components/AdminReplyModal';
 import AdminReciveBox from '@/components/AdminReciveBox';
 import AdminSentBox from '@/components/AdminSentBox';
 import { fetchReceivedMessages, fetchSentMessages } from '@/api/message';
+import type { Account } from '@/api/user'; // Import Account type
 
 const { Title } = Typography;
 
@@ -20,9 +21,8 @@ interface Message {
   read_status: 0 | 1;
 }
 
-const ADMIN_ID = 1; // Assuming Admin's ID is 1
-
 const AdminMessagePage = () => {
+  const [adminId, setAdminId] = useState<number>(-1);
   const [messages, setMessages] = useState<Message[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -34,14 +34,22 @@ const AdminMessagePage = () => {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
+    const storedAccountString = localStorage.getItem('loginAccount');
+    if (storedAccountString) {
+      const storedAccount: Account = JSON.parse(storedAccountString);
+      setAdminId(storedAccount.id);
+    } else {
+      message.error('请重新登录');
+    }
+
     const loadMessages = async () => {
       setLoading(true);
       try {
         if (currentView === 'inbox') {
-          const received = await fetchReceivedMessages(ADMIN_ID);
+          const received = await fetchReceivedMessages(adminId);
           setMessages(received);
         } else if (currentView === 'sent') {
-          const sent = await fetchSentMessages(ADMIN_ID);
+          const sent = await fetchSentMessages(adminId);
           setAdminSentMessages(sent);
         }
       } catch (error) {
@@ -52,7 +60,7 @@ const AdminMessagePage = () => {
     };
 
     loadMessages();
-  }, [currentView]); // Reload messages when currentView changes
+  }, [currentView, adminId]); // Reload messages when currentView changes
 
   const handleCloseReplyModal = () => {
     setIsReplyModalVisible(false);
@@ -83,6 +91,7 @@ const AdminMessagePage = () => {
           setIsModalVisible={setIsModalVisible}
           setIsReplyModalVisible={setIsReplyModalVisible}
           setReplyingToMessage={setReplyingToMessage}
+          adminId={adminId}
           loading={loading}
         />
       )}

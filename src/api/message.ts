@@ -16,6 +16,14 @@ export interface MarkReadPayload {
   message_id: number;
 }
 
+// Add these new interfaces and functions:
+export interface SendMessagePayload {
+  sender_id: number;
+  receiver_id: number;
+  title: string;
+  message_content: string;
+}
+
 export const fetchReceivedMessages = async (userId: number): Promise<Message[]> => {
   try {
     const messages = await invoke<Message[]>("get_recived_messages", { userId });
@@ -62,6 +70,52 @@ export const markMessageAsReadApi = async (messageId: number, currentUserId: num
       throw error;
     } else {
       throw new Error("An unknown error occurred while marking the message as read.");
+    }
+  }
+};
+
+export const sendMessageApi = async (payload: SendMessagePayload): Promise<number> => {
+  try {
+    if (!payload.message_content.trim()) {
+      // Frontend validation, though backend also validates
+      throw new Error("消息内容不能为空");
+    }
+    if (!payload.title.trim()) {
+      // Frontend validation, though backend also validates
+      throw new Error("消息标题不能为空");
+    }
+    if (payload.sender_id === payload.receiver_id) {
+      throw new Error("发送者和接收者不能是同一用户");
+    }
+    // The backend command is "send_message" and expects the payload wrapped in a "data" field.
+    const result = await invoke<number>("send_message", { data: payload });
+
+    // Backend returns:
+    // Ok(0) -> Message sent successfully
+    // Ok(1) -> Sender not found
+    // Ok(2) -> Receiver not found
+    // Err(string) -> Other errors (which invoke will throw as an error)
+
+    if (result === 0) {
+      return 0; // Success
+    } else if (result === 1) {
+      throw new Error("发送方用户不存在。");
+    } else if (result === 2) {
+      throw new Error("接收方用户不存在。");
+    } else {
+      // This case should ideally not be reached if backend strictly returns 0, 1, or 2 for Ok variants.
+      throw new Error(`发送消息时发生未知服务端状态码: ${result}`);
+    }
+  } catch (error) {
+    console.error("Failed to send message:", error);
+    if (typeof error === 'string') {
+      // This can be an error message from invoke if the command itself fails (e.g., command not found)
+      // or a string error from the Rust Err(String)
+      throw new Error(error);
+    } else if (error instanceof Error) {
+      throw error; // Rethrow errors from validation or specific error cases above
+    } else {
+      throw new Error("发送消息时发生未知网络或系统错误。");
     }
   }
 };

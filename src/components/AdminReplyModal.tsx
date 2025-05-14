@@ -1,105 +1,119 @@
-import React from 'react';
-import { Modal, Form, Input, Button, Typography, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Modal, Form, Input, Button, message as AntMessage } from 'antd';
+import { sendMessageApi, fetchSentMessages } from '@/api/message';
+import type { SendMessagePayload, Message } from '@/api/message';
 
 const { TextArea } = Input;
-const { Title } = Typography;
-
-// Interface for messages sent by the admin
-interface Message {
-  id: number;
-  sender_id: number;
-  receiver_id: number; // For received messages, this is the Admin's ID
-  title: string;
-  message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
-}
 
 interface AdminReplyModalProps {
   visible: boolean;
-  recipientId: number;
-  originalMessageTitle?: string;
-  adminSentMessages: Message[];
+  adminId: number; // ID of the admin sending the message
+  recipientId: number; // ID of the user receiving the message
+  recipientName: string; // Username of the recipient
+  originalMessageTitle: string; // Title of the message being replied to
   setAdminSentMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   handleCloseReplyModal: () => void;
 }
 
 const AdminReplyModal: React.FC<AdminReplyModalProps> = ({
   visible,
+  adminId,
   recipientId,
+  recipientName,
   originalMessageTitle,
-  adminSentMessages,
   setAdminSentMessages,
   handleCloseReplyModal,
 }) => {
   const [form] = Form.useForm();
+  const [loading, setLoading] = useState(false);
 
-  const onSend = (replyTitle: string, replyContent: string) => {
+  useEffect(() => {
+    if (visible) {
+      form.setFieldsValue({
+        title: originalMessageTitle ? `回复: ${originalMessageTitle}` : '',
+        message_content: '',
+      });
+    }
+  }, [visible, originalMessageTitle, form]);
 
-    const newReply: Message = {
-      id: Date.now(), // Mock ID
-      sender_id: 1,
-      receiver_id: recipientId, // Reply to the original sender
-      title: replyTitle,
-      message_content: replyContent,
-      send_date: new Date().toISOString().split('T')[0],
-      read_status: 0, // Assuming user hasn't read it yet
+  const handleSendReply = async (values: { title: string; message_content: string }) => {
+    if (adminId === -1) {
+      AntMessage.error('管理员ID无效，无法发送消息。请确保管理员已登录。');
+      return;
+    }
+    if (!values.message_content.trim()) {
+      AntMessage.error('消息内容不能为空！'); // Should be caught by Form rules, but good to double check
+      return;
+    }
+    if (!values.title.trim()) {
+      AntMessage.error('消息标题不能为空！'); // Should be caught by Form rules, but good to double check
+      return;
+    }
+
+    setLoading(true);
+    const payload: SendMessagePayload = {
+      sender_id: adminId,
+      receiver_id: recipientId,
+      title: values.title,
+      message_content: values.message_content,
     };
 
-    setAdminSentMessages([newReply, ...adminSentMessages]);
-    message.success(`回复已发送给 User ${recipientId}`);
-    handleCloseReplyModal();
-  };
+    try {
+      await sendMessageApi(payload); // sendMessageApi now throws for non-zero status or other errors
+      AntMessage.success('回复发送成功！');
 
-  const handleSendReply = () => {
-    form
-      .validateFields()
-      .then((values) => {
-        onSend(values.title, values.content);
-        form.resetFields();
-      })
-      .catch((info) => {
-        console.log('Validate Failed:', info);
-      });
+      // Refresh the sent messages list in AdminMessagePage
+      if (adminId !== -1) {
+        const updatedSentMessages = await fetchSentMessages(adminId);
+        setAdminSentMessages(updatedSentMessages);
+      }
+      handleCloseReplyModal();
+      form.resetFields();
+    } catch (error: any) {
+      AntMessage.error(`发送失败: ${error.message || '未知错误'}`);
+    } finally {
+      setLoading(false);
+    }
   };
-
-  const modalTitle = (
-    <Title level={4} className="text-purple-600">
-      回复用户: {recipientId} {originalMessageTitle && `(原标题: ${originalMessageTitle})`}
-    </Title>
-  );
 
   return (
     <Modal
-      title={modalTitle}
+      title={`回复 ${recipientName}`}
       open={visible}
-      onCancel={handleCloseReplyModal}
-      destroyOnClose
+      onCancel={() => {
+        if (!loading) {
+          handleCloseReplyModal();
+          form.resetFields();
+        }
+      }}
       footer={[
-        <Button key="back" onClick={handleCloseReplyModal} className="hover:bg-gray-200">
+        <Button key="back" onClick={() => {
+          if (!loading) {
+            handleCloseReplyModal();
+            form.resetFields();
+          }
+        }} disabled={loading}>
           取消
         </Button>,
-        <Button key="submit" type="primary" onClick={handleSendReply} className="bg-purple-500 hover:bg-purple-600">
-          发送回复
+        <Button key="submit" type="primary" loading={loading} onClick={() => form.submit()}>
+          发送
         </Button>,
       ]}
-      width={600}
+      destroyOnClose // Ensures form is reset when modal is closed and re-opened
     >
-      <Form form={form} layout="vertical" name="admin_reply_form" className="mt-4">
+      <Form form={form} layout="vertical" onFinish={handleSendReply} preserve={false}>
         <Form.Item
           name="title"
-          label="回复标题"
-          rules={[{ required: true, message: '请输入回复标题!' }]}
-          initialValue={originalMessageTitle ? `Re: ${originalMessageTitle}` : ''}
+          label="标题"
         >
-          <Input placeholder="请输入回复标题" />
+          <Input placeholder="输入回复标题 (可选)" />
         </Form.Item>
         <Form.Item
-          name="content"
-          label="回复内容"
-          rules={[{ required: true, message: '请输入回复内容!' }]}
+          name="message_content"
+          label="内容"
+          rules={[{ required: true, message: '请输入消息内容!' }]}
         >
-          <TextArea rows={5} placeholder="请输入详细的回复内容..." />
+          <TextArea rows={4} placeholder="输入回复内容" />
         </Form.Item>
       </Form>
     </Modal>

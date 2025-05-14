@@ -114,16 +114,17 @@ const AdminMessagePage = () => {
         />
       )}
 
-      {/* {replyingToMessage && (
+      {replyingToMessage && (
         <AdminReplyModal
           visible={isReplyModalVisible}
+          adminId={adminId}
           recipientId={replyingToMessage.sender_id}
+          recipientName={replyingToMessage.sender_username}
           originalMessageTitle={replyingToMessage.title}
-          adminSentMessages={adminSentMessages}
           setAdminSentMessages={setAdminSentMessages}
           handleCloseReplyModal={handleCloseReplyModal}
         />
-      )} */}
+      )}
 
     </div>
   );

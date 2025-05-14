@@ -37,7 +37,7 @@ struct GoodsConsumptionShare {
 
 #[derive(Deserialize)]
 struct UpdateUserData {
-    username: Option<String>, 
+    username: Option<String>,
     phone: Option<String>,
     gender: Option<i8>,
 }
@@ -482,10 +482,12 @@ fn update_user_details(
             return Err("Username cannot be empty.".to_string());
         }
 
-        let current_username_check: Option<String> = conn.exec_first(
-            "SELECT username FROM account WHERE id = :user_id",
-            params! { "user_id" => user_id }
-        ).map_err(|e| format!("DB error checking current username: {}", e))?;
+        let current_username_check: Option<String> = conn
+            .exec_first(
+                "SELECT username FROM account WHERE id = :user_id",
+                params! { "user_id" => user_id },
+            )
+            .map_err(|e| format!("DB error checking current username: {}", e))?;
 
         let is_changing_username = match current_username_check {
             Some(ref current_uname) => current_uname != uname_val,
@@ -506,11 +508,14 @@ fn update_user_details(
         }
     }
 
-    if let Some(phone_val) = &data.phone { // 前端会传来 Some("") 或 Some("有效号码") 或 Some(null) -> Option<String>
-        if phone_val.is_empty() { // 用户意图清空手机号
+    if let Some(phone_val) = &data.phone {
+        // 前端会传来 Some("") 或 Some("有效号码") 或 Some(null) -> Option<String>
+        if phone_val.is_empty() {
+            // 用户意图清空手机号
             set_clauses.push("phone = NULL".to_string());
             // 不需要向 query_params_vec 添加，因为 NULL 直接在 SQL 语句中
-        } else { // 用户输入了非空手机号
+        } else {
+            // 用户输入了非空手机号
             if !phone_val.chars().all(|c| c.is_ascii_digit()) || phone_val.len() != 11 {
                 return Err("Invalid phone number format. Must be 11 digits.".to_string());
             }
@@ -520,8 +525,8 @@ fn update_user_details(
     }
     // 如果 data.phone 是 None (前端根本没传这个字段)，则不处理 phone 的更新
 
-
-    if let Some(gender_val) = data.gender { // 前端传来 Some(0), Some(1), 或 Some(null) -> Option<i8>
+    if let Some(gender_val) = data.gender {
+        // 前端传来 Some(0), Some(1), 或 Some(null) -> Option<i8>
         if gender_val == 0 || gender_val == 1 {
             set_clauses.push("gender = :gender".to_string());
             query_params_vec.push(("gender".to_string(), gender_val.into()));
@@ -574,7 +579,6 @@ fn update_user_details(
         }
     }
 }
-
 
 #[tauri::command]
 fn update_user_password(
@@ -1160,7 +1164,7 @@ fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Result<S
 }
 
 #[tauri::command]
-fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String, String> {
+fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<i32, String> {
     if data.message_content.is_empty() {
         return Err("Message content cannot be empty".to_string());
     }
@@ -1172,7 +1176,7 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // Optional: Check if sender_id and receiver_id exist in the account table
+    // Check if sender_id exists in the account table
     let sender_exists: Option<i64> = conn
         .exec_first(
             "SELECT id FROM account WHERE id = :id",
@@ -1180,9 +1184,14 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String
         )
         .map_err(|e| format!("Failed to verify sender: {}", e))?;
     if sender_exists.is_none() {
-        return Err(format!("Sender with ID {} not found.", data.sender_id));
+        println!(
+            "Send message failed: Sender with ID {} not found.",
+            data.sender_id
+        );
+        return Ok(1); // Sender not found
     }
 
+    // Check if receiver_id exists in the account table
     let receiver_exists: Option<i64> = conn
         .exec_first(
             "SELECT id FROM account WHERE id = :id",
@@ -1190,7 +1199,11 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String
         )
         .map_err(|e| format!("Failed to verify receiver: {}", e))?;
     if receiver_exists.is_none() {
-        return Err(format!("Receiver with ID {} not found.", data.receiver_id));
+        println!(
+            "Send message failed: Receiver with ID {} not found.",
+            data.receiver_id
+        );
+        return Ok(2); // Receiver not found
     }
 
     let current_date = Local::now().date_naive();
@@ -1211,10 +1224,10 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String
     match result {
         Ok(_) => {
             println!(
-                "Message sent from {} to {}",
+                "Message sent successfully from {} to {}",
                 data.sender_id, data.receiver_id
             );
-            Ok("Message sent successfully.".to_string())
+            Ok(0) // Message sent successfully
         }
         Err(e) => {
             eprintln!("Database insert failed for message: {}", e);

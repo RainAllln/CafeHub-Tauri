@@ -26,6 +26,11 @@
     "targets": "all",
     "icon": [
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "wix": {
+        "language": "zh-CN"
+      }
+    }
   }
 }

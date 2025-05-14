@@ -7,20 +7,24 @@ interface Message {
   id: number;
   sender_id: number;
   receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
   read_status: 0 | 1;
 }
 
 interface AdminSentMessage {
   id: number;
-  sender_id: number;    // Admin's ID
-  receiver_id: number;  // User's ID (original sender)
+  sender_id: number;
+  receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
+  read_status: 0 | 1;
 }
 
 interface MessageContentProps {
@@ -52,8 +56,8 @@ const MessageContent: React.FC<MessageContentProps> = ({ selectedMessage, isModa
         width={600}
       >
         <div className="space-y-3">
-          <Paragraph><strong className="text-gray-700">From:</strong> 用户 {selectedMessage.sender_id}</Paragraph>
-          <Paragraph><strong className="text-gray-700">To:</strong> 用户 {selectedMessage.receiver_id}</Paragraph>
+          <Paragraph><strong className="text-gray-700">From:</strong> {selectedMessage.sender_username}</Paragraph>
+          <Paragraph><strong className="text-gray-700">To:</strong> {selectedMessage.receiver_username}</Paragraph>
           <Paragraph><strong className="text-gray-700">Date:</strong> {selectedMessage.send_date}</Paragraph>
           <Paragraph className="mt-2 p-3 bg-gray-50 rounded border border-gray-200">
             {selectedMessage.message_content}

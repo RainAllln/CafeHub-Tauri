@@ -135,7 +135,6 @@ struct MessageInfo {
     message_content: String,
     send_date: Option<NaiveDate>,
     read_status: i8, // 0: Unread, 1: Read
-    is_sender: bool, // True if the current user is the sender of this message
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -1225,7 +1224,7 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String
 }
 
 #[tauri::command]
-fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
+fn get_sent_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
     let mut conn = mysql_pool
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
@@ -1239,8 +1238,7 @@ fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<Messag
         FROM message m
         JOIN account s_acc ON m.sender_id = s_acc.id
         JOIN account r_acc ON m.receiver_id = r_acc.id
-        WHERE m.sender_id = :user_id OR m.receiver_id = :user_id
-        ORDER BY m.send_date DESC, m.id DESC";
+        WHERE m.sender_id = :user_id";
 
     let results: Vec<MessageInfo> = conn
         .exec_map(
@@ -1267,11 +1265,60 @@ fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<Messag
                     message_content,
                     send_date,
                     read_status,
-                    is_sender: sender_id_db == user_id,
                 }
             },
         )
-        .map_err(|e| format!("Database query failed for user messages: {}", e))?;
+        .map_err(|e| format!("Database query failed for sent messages: {}", e))?;
+
+    Ok(results)
+}
+
+#[tauri::command]
+fn get_recived_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let query = "
+        SELECT
+            m.id, m.sender_id, m.receiver_id,
+            s_acc.username AS sender_username,
+            r_acc.username AS receiver_username,
+            m.title, m.message_content, m.send_date, m.read_status
+        FROM message m
+        JOIN account s_acc ON m.sender_id = s_acc.id
+        JOIN account r_acc ON m.receiver_id = r_acc.id
+        WHERE m.receiver_id = :user_id";
+
+    let results: Vec<MessageInfo> = conn
+        .exec_map(
+            query,
+            params! { "user_id" => user_id },
+            |(
+                id,
+                sender_id_db,
+                receiver_id_db,
+                sender_username,
+                receiver_username,
+                title,
+                message_content,
+                send_date,
+                read_status,
+            )| {
+                MessageInfo {
+                    id,
+                    sender_id: sender_id_db,
+                    receiver_id: receiver_id_db,
+                    sender_username,
+                    receiver_username,
+                    title,
+                    message_content,
+                    send_date,
+                    read_status,
+                }
+            },
+        )
+        .map_err(|e| format!("Database query failed for recieved messages: {}", e))?;
 
     Ok(results)
 }
@@ -1281,39 +1328,94 @@ fn mark_message_as_read(
     data: MarkReadData,
     current_user_id: i64, // ID of the user performing the action (should be the receiver)
     mysql_pool: State<Pool>,
-) -> Result<String, String> {
+) -> Result<i32, String> {
+    // Changed return type
     let mut conn = mysql_pool
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    let result = conn.exec_drop(
-        "UPDATE message SET read_status = 1 WHERE id = :message_id AND receiver_id = :receiver_id AND read_status = 0",
-        params! {
-            "message_id" => data.message_id,
-            "receiver_id" => current_user_id,
-        }
+    // Step 1: Query the message to check its current state and receiver
+    let query_result: Result<Option<(i64, i8)>, mysql::Error> = conn.exec_first(
+        "SELECT receiver_id, read_status FROM message WHERE id = :message_id",
+        params! { "message_id" => data.message_id },
     );
 
-    match result {
-        Ok(_) => {
-            if conn.affected_rows() > 0 {
+    match query_result {
+        Ok(Some((receiver_id_db, read_status_db))) => {
+            // Message found, check conditions
+            if receiver_id_db != current_user_id {
+                // Current user is not the receiver
                 println!(
-                    "Message ID {} marked as read by user ID {}.",
+                    "User ID {} attempted to mark message ID {} as read, but is not the receiver (receiver ID {}).",
+                    current_user_id, data.message_id, receiver_id_db
+                );
+                return Ok(1);
+            }
+
+            if read_status_db == 1 {
+                // Message already read by the receiver
+                println!(
+                    "Message ID {} was already read by user ID {}.",
                     data.message_id, current_user_id
                 );
-                Ok(format!("Message ID {} marked as read.", data.message_id))
-            } else {
-                // Could be that message doesn't exist, user is not receiver, or already read
-                Err(format!("Failed to mark message ID {} as read. It might not exist, you might not be the receiver, or it was already read.", data.message_id))
+                return Ok(0);
+            }
+
+            // At this point, message exists, current_user is the receiver, and message is unread.
+            // Proceed to update.
+            let update_result = conn.exec_drop(
+                "UPDATE message SET read_status = 1 WHERE id = :message_id AND receiver_id = :receiver_id",
+                params! {
+                    "message_id" => data.message_id,
+                    "receiver_id" => current_user_id,
+                }
+            );
+
+            match update_result {
+                Ok(_) => {
+                    if conn.affected_rows() > 0 {
+                        println!(
+                            "Message ID {} marked as read by user ID {}.",
+                            data.message_id, current_user_id
+                        );
+                        Ok(0) // Successfully marked as read
+                    } else {
+                        // This case implies the message state changed concurrently (e.g., deleted)
+                        // between the SELECT and UPDATE, or an unexpected issue.
+                        eprintln!(
+                            "Failed to mark message ID {} as read for user ID {}: 0 rows affected despite prior checks.",
+                            data.message_id, current_user_id
+                        );
+                        Err(format!(
+                            "Failed to mark message ID {} as read. The message state might have changed concurrently or an unexpected issue occurred.",
+                            data.message_id
+                        ))
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Database update failed for marking message read (ID {}): {}",
+                        data.message_id, e
+                    );
+                    Err(format!(
+                        "Database error while marking message as read: {}",
+                        e
+                    ))
+                }
             }
         }
+        Ok(None) => {
+            // Message not found
+            Err(format!("Message with ID {} not found.", data.message_id))
+        }
         Err(e) => {
+            // Error during the initial query
             eprintln!(
-                "Database update failed for marking message read (ID {}): {}",
+                "Database query failed for message details (ID {}): {}",
                 data.message_id, e
             );
             Err(format!(
-                "Database error while marking message as read: {}",
+                "Database query failed to retrieve message details: {}",
                 e
             ))
         }
@@ -1371,7 +1473,8 @@ pub fn run() {
             report_lost_item,
             claim_lost_item,
             send_message,
-            get_user_messages,
+            get_sent_messages,
+            get_recived_messages,
             mark_message_as_read,
             get_all_users,
             recharge_balance

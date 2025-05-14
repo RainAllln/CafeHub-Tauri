@@ -890,7 +890,6 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<i3
     struct ProcessedItemDetail {
         goods_id: i32,
         quantity: i32,
-        price_per_item: Decimal,
         item_total_price: Decimal,
     }
     let mut processed_item_details: Vec<ProcessedItemDetail> = Vec::new();
@@ -921,7 +920,6 @@ fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Result<i3
         processed_item_details.push(ProcessedItemDetail {
             goods_id: item.goods_id,
             quantity: item.quantity,
-            price_per_item,
             item_total_price,
         });
     }

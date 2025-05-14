@@ -1,6 +1,6 @@
 import { Modal, Input, Form, message } from 'antd'; // Removed DatePicker
 import React, { useState } from 'react';
-import { invoke } from '@tauri-apps/api/core';
+import { reportLostItem } from '@/api/lost';
 
 // Interface for form values
 interface ReportFormValues {
@@ -43,7 +43,7 @@ const ReportLost: React.FC<ReportLostProps> = ({
         // pick_time is handled by the backend
       };
 
-      await invoke('report_lost_item', { data: reportData });
+      reportLostItem(reportData)
 
       message.success('失物报告成功！');
       form.resetFields();

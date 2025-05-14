@@ -13,6 +13,12 @@ export interface LostItem {
     status: 0 | 1; // 0: Unclaimed, 1: Claimed
 }
 
+interface ReportLostItemPayload {
+    item_name: string;
+    pick_place?: string;
+    pick_user_id?: number;
+}
+
 /**
  * Fetches all lost items from the backend.
  * @returns A promise that resolves to an array of LostItem objects.
@@ -29,3 +35,23 @@ export const getAllLostItems = async (): Promise<LostItem[]> => {
         throw error; // Re-throw to allow caller to handle
     }
 };
+
+export const claimLostItem = async (itemId: number, claim_user_id: number): Promise<number> => {
+    try {
+        await invoke('claim_lost_item', { data: { item_id: itemId, claim_user_id: claim_user_id } });
+        return 0;
+    } catch (err) {
+        console.error("Failed to claim item:", err);
+        return 1;
+    }
+}
+
+export const reportLostItem = async (reportData: ReportLostItemPayload): Promise<void> => {
+    try {
+        await invoke('report_lost_item', { data: reportData });
+        console.log("Lost item reported successfully:", reportData);
+    } catch (error) {
+        console.error("Failed to report lost item:", error);
+        throw error; // Re-throw to allow caller to handle
+    }
+}

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Table, Button, Tag, Space, message } from 'antd';
 import type { TableProps } from 'antd';
 import ReportLost from '@/components/ReportLost';
-import { getAllLostItems, LostItem as ApiLostItem } from '../api/lost';
+import { getAllLostItems, LostItem as ApiLostItem, claimLostItem } from '../api/lost';
 import { invoke } from '@tauri-apps/api/core';
 import type { Account } from '../api/user'; // Added import for Account type
 
@@ -68,13 +68,12 @@ const CustomerLostPage = () => {
       message.error('请先登录才能认领物品。');
       return;
     }
-    try {
-      await invoke('claim_lost_item', { data: { item_id: itemId, claim_user_id: currentUserId } });
-      message.success('物品认领成功！请等待管理员确认。');
+    const res = await claimLostItem(itemId, currentUserId);
+    if (res == 0) {
+      message.success('认领成功！');
       fetchLostItems();
-    } catch (err) {
-      console.error("Failed to claim item:", err);
-      message.error(err instanceof Error ? err.message : '认领失败，请重试');
+    } else {
+      message.error('认领失败，请稍后重试。');
     }
   };
 

@@ -24,6 +24,12 @@ export interface SendMessagePayload {
   message_content: string;
 }
 
+export interface CustomerSendMessagePayload {
+  sender_id: number;
+  title?: string; // Matching backend's Option<String>
+  message_content: string;
+}
+
 export const fetchReceivedMessages = async (userId: number): Promise<Message[]> => {
   try {
     const messages = await invoke<Message[]>("get_recived_messages", { userId });
@@ -88,7 +94,7 @@ export const sendMessageApi = async (payload: SendMessagePayload): Promise<numbe
       throw new Error("发送者和接收者不能是同一用户");
     }
     // The backend command is "send_message" and expects the payload wrapped in a "data" field.
-    const result = await invoke<number>("send_message", { data: payload });
+    const result = await invoke<number>("admin_send_message", { data: payload });
 
     // Backend returns:
     // Ok(0) -> Message sent successfully
@@ -116,6 +122,43 @@ export const sendMessageApi = async (payload: SendMessagePayload): Promise<numbe
       throw error; // Rethrow errors from validation or specific error cases above
     } else {
       throw new Error("发送消息时发生未知网络或系统错误。");
+    }
+  }
+};
+
+export const customerSendMessageApi = async (payload: CustomerSendMessagePayload): Promise<number> => {
+  try {
+    if (!payload.message_content.trim()) {
+      throw new Error("消息内容不能为空");
+    }
+    // Title can be optional, backend handles Option<String>
+    // Backend's customer_send_message determines admin receiver and validates sender.
+
+    const result = await invoke<number>("customer_send_message", { data: payload });
+
+    // Backend returns:
+    // Ok(0) -> Message sent successfully
+    // Ok(1) -> Sender (customer) not found
+    // Ok(2) -> Administrator (receiver) not found
+    // Err(string) -> Other errors
+
+    if (result === 0) {
+      return 0; // Success
+    } else if (result === 1) {
+      throw new Error("发送方用户不存在或非客户账户。");
+    } else if (result === 2) {
+      throw new Error("管理员账户未找到，无法发送消息。");
+    } else {
+      throw new Error(`发送消息时发生未知服务端状态码: ${result}`);
+    }
+  } catch (error) {
+    console.error("Failed to send customer message:", error);
+    if (typeof error === 'string') {
+      throw new Error(error);
+    } else if (error instanceof Error) {
+      throw error;
+    } else {
+      throw new Error("发送客户消息时发生未知网络或系统错误。");
     }
   }
 };

@@ -123,6 +123,12 @@ struct SendMessageData {
     title: Option<String>,
     message_content: String,
 }
+#[derive(Deserialize)]
+struct CusSendMessageData {
+    sender_id: i64,
+    title: Option<String>,
+    message_content: String,
+}
 
 #[derive(Serialize, Deserialize, Clone)]
 struct MessageInfo {
@@ -1164,7 +1170,7 @@ fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Result<S
 }
 
 #[tauri::command]
-fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<i32, String> {
+fn admin_send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<i32, String> {
     if data.message_content.is_empty() {
         return Err("Message content cannot be empty".to_string());
     }
@@ -1228,6 +1234,107 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<i32, S
                 data.sender_id, data.receiver_id
             );
             Ok(0) // Message sent successfully
+        }
+        Err(e) => {
+            eprintln!("Database insert failed for message: {}", e);
+            Err(format!("Database error while sending message: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+fn customer_send_message(data: CusSendMessageData, mysql_pool: State<Pool>) -> Result<i32, String> {
+    if data.message_content.is_empty() {
+        return Err("Message content cannot be empty".to_string());
+    }
+
+    // Note: data.receiver_id from SendMessageData is ignored in this function,
+    // as the receiver is always the administrator.
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    // 1. Find the administrator's ID (user_type = 0)
+    let admin_id_result: Result<Option<i64>, mysql::Error> = conn.exec_first(
+        "SELECT id FROM account WHERE user_type = 0 LIMIT 1", // Assuming one admin
+        (),
+    );
+
+    let admin_id = match admin_id_result {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            println!("Send message failed: Administrator account (user_type = 0) not found.");
+            return Ok(2); // 2: Administrator (intended receiver) not found
+        }
+        Err(e) => {
+            eprintln!("Database error while querying for administrator: {}", e);
+            return Err(format!("Database error finding administrator: {}", e));
+        }
+    };
+
+    // 2. Validate Sender ID (must be a customer, e.g., user_type = 1)
+    let sender_info_result: Result<Option<i8>, mysql::Error> = conn.exec_first(
+        "SELECT user_type FROM account WHERE id = :sender_id",
+        params! {"sender_id" => data.sender_id},
+    );
+
+    match sender_info_result {
+        Ok(Some(user_type)) => {
+            // Assuming user_type 1 is for customers. Adjust if different.
+            if user_type != 1 {
+                println!(
+                    "Send message failed: Sender ID {} is not a customer (user_type: {}).",
+                    data.sender_id, user_type
+                );
+                return Err(format!(
+                    "Sender ID {} is not a customer. Only customers can send messages to the administrator.",
+                    data.sender_id
+                ));
+            }
+            // Sender is a valid customer
+        }
+        Ok(None) => {
+            println!(
+                "Send message failed: Sender (customer) with ID {} not found.",
+                data.sender_id
+            );
+            return Ok(1); // 1: Sender not found
+        }
+        Err(e) => {
+            eprintln!("Database error while verifying sender: {}", e);
+            return Err(format!("Database error verifying sender: {}", e));
+        }
+    }
+
+    // The original check `data.sender_id == data.receiver_id` is implicitly handled.
+    // If data.sender_id (customer, user_type=1) were equal to admin_id (user_type=0),
+    // it would imply a single account ID has two conflicting user_types,
+    // which is not possible if 'id' is a primary key and user_types are mutually exclusive for a given ID.
+    // The user_type validation for the sender ensures they are a customer.
+
+    let current_date = Local::now().date_naive();
+    let read_status: i8 = 0; // 0: Unread
+
+    let result = conn.exec_drop(
+        "INSERT INTO message (sender_id, receiver_id, title, message_content, send_date, read_status) VALUES (:sender_id, :receiver_id, :title, :message_content, :send_date, :read_status)",
+        params! {
+            "sender_id" => data.sender_id, // Customer's ID
+            "receiver_id" => admin_id,    // Administrator's ID
+            "title" => &data.title,
+            "message_content" => &data.message_content,
+            "send_date" => current_date,
+            "read_status" => read_status,
+        }
+    );
+
+    match result {
+        Ok(_) => {
+            println!(
+                "Message sent successfully from customer {} to administrator {}",
+                data.sender_id, admin_id
+            );
+            Ok(0) // 0: Message sent successfully
         }
         Err(e) => {
             eprintln!("Database insert failed for message: {}", e);
@@ -1485,7 +1592,8 @@ pub fn run() {
             get_all_lost_items,
             report_lost_item,
             claim_lost_item,
-            send_message,
+            admin_send_message,
+            customer_send_message,
             get_sent_messages,
             get_recived_messages,
             mark_message_as_read,

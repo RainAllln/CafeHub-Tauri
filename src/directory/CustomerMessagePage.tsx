@@ -1,72 +1,22 @@
-import React, { useState } from 'react';
-import { Button, Typography, Tabs } from 'antd';
+import React, { useState, useEffect } from 'react'; // Added useEffect
+import { Button, Typography, Tabs, message as AntMessage } from 'antd'; // Renamed message to AntMessage
 import { SendOutlined, InboxOutlined, MailOutlined } from '@ant-design/icons';
 import CusSendMessage from '@/components/CusSendMessage';
 import MessageContent from '@/components/MessageContent';
 import CustomerReciveBox from '@/components/CustomerReciveBox';
 import CustomerSentBox from '@/components/CustomerSentBox';
+import { fetchReceivedMessages, fetchSentMessages, Message } from '@/api/message'; // Import Message type from API
+import type { Account } from '@/api/user'; // Import Account type
 
 const { Title } = Typography;
 const { TabPane } = Tabs;
 
-interface Message {
-  id: number;
-  sender_id: number;
-  receiver_id: number; // For received messages, this is the Admin's ID
-  title: string;
-  message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
-}
-
-const CURRENT_USER_ID = 101;
-const ADMIN_ID = 1;
-
-const mockSentMessages: Message[] = [
-  {
-    id: 10,
-    sender_id: CURRENT_USER_ID,
-    receiver_id: ADMIN_ID,
-    title: 'Inquiry about order #56789',
-    message_content: 'Hello Admin, I have a question regarding my order #56789. Can you please provide an update on its shipping status? Thank you.',
-    send_date: '2025-05-09',
-    read_status: 1, // Admin has read this
-  },
-  {
-    id: 11,
-    sender_id: CURRENT_USER_ID,
-    receiver_id: ADMIN_ID,
-    title: 'Technical support needed for product X',
-    message_content: 'Hi Admin, I am experiencing a technical issue with Product X. It suddenly stopped working. Could you guide me on troubleshooting steps or arrange for a repair?',
-    send_date: '2025-05-10',
-    read_status: 0, // Admin has not read this yet
-  },
-];
-
-const mockReceivedMessages: Message[] = [
-  {
-    id: 201,
-    sender_id: ADMIN_ID,
-    receiver_id: CURRENT_USER_ID,
-    title: 'Re: Inquiry about order #56789',
-    message_content: 'Hello User, regarding your order #56789, it has been shipped and the tracking number is XYZ12345. You can expect delivery by 2025-05-12.',
-    send_date: '2025-05-10',
-    read_status: 0, // User has not read this yet
-  },
-  {
-    id: 202,
-    sender_id: ADMIN_ID,
-    receiver_id: CURRENT_USER_ID,
-    title: 'Important Account Update',
-    message_content: 'Dear User, we have updated our terms of service. Please review them at your earliest convenience. Thank you for being a valued customer.',
-    send_date: '2025-05-11',
-    read_status: 1, // User has read this
-  },
-];
+// Removed local Message interface, CURRENT_USER_ID, ADMIN_ID, and mock data
 
 const CustomerMessagePage = () => {
-  const [sentMessages, setSentMessages] = useState<Message[]>(mockSentMessages);
-  const [receivedMessages, setReceivedMessages] = useState<Message[]>(mockReceivedMessages);
+  const [currentUser, setCurrentUser] = useState<Account | null>(null);
+  const [sentMessages, setSentMessages] = useState<Message[]>([]);
+  const [receivedMessages, setReceivedMessages] = useState<Message[]>([]);
 
   const [selectedSentMessage, setSelectedSentMessage] = useState<Message | null>(null);
   const [isViewSentModalVisible, setIsViewSentModalVisible] = useState(false);
@@ -75,9 +25,56 @@ const CustomerMessagePage = () => {
   const [isViewReceivedModalVisible, setIsViewReceivedModalVisible] = useState(false);
 
   const [isNewMessageModalVisible, setIsNewMessageModalVisible] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false); // Added loading state
 
-  // --- Handlers for New Message ---
+  useEffect(() => {
+    const storedAccountString = localStorage.getItem('loginAccount');
+    if (storedAccountString) {
+      try {
+        const storedAccount: Account = JSON.parse(storedAccountString);
+        if (storedAccount.user_type !== 1) { // Ensure it's a customer (user_type 1)
+          AntMessage.error('您不是客户账户，无法访问此页面。');
+          // Potentially redirect or disable functionality
+          return;
+        }
+        setCurrentUser(storedAccount);
+      } catch (e) {
+        AntMessage.error('登录信息解析失败，请重新登录。');
+        localStorage.removeItem('loginAccount');
+      }
+    } else {
+      AntMessage.error('请先登录以访问消息中心。');
+      // Potentially redirect to login
+    }
+  }, []);
+
+  useEffect(() => {
+    if (currentUser && currentUser.id !== -1) { // Ensure currentUser and its id are valid
+      const loadMessages = async () => {
+        setLoading(true);
+        try {
+          const [sent, received] = await Promise.all([
+            fetchSentMessages(currentUser.id),
+            fetchReceivedMessages(currentUser.id),
+          ]);
+          setSentMessages(sent);
+          setReceivedMessages(received);
+        } catch (error: any) {
+          AntMessage.error(`加载消息失败: ${error.message || '未知错误'}`);
+        } finally {
+          setLoading(false);
+        }
+      };
+      loadMessages();
+    }
+  }, [currentUser]);
+
+
   const handleOpenNewMessageModal = () => {
+    if (!currentUser) {
+      AntMessage.error('请先登录再发送消息。');
+      return;
+    }
     setIsNewMessageModalVisible(true);
   };
 
@@ -87,7 +84,7 @@ const CustomerMessagePage = () => {
       <div className="max-w-5xl mx-auto bg-white shadow-2xl rounded-lg p-4 md:p-8">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 pb-4 border-b border-gray-200">
           <Title level={2} className="!mb-2 sm:!mb-0 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">
-            我的消息中心
+            我的消息中心 {currentUser && `- ${currentUser.username}`}
           </Title>
           <Button
             type="primary"
@@ -95,6 +92,7 @@ const CustomerMessagePage = () => {
             onClick={handleOpenNewMessageModal}
             className="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 border-none text-white shadow-md hover:shadow-lg transition-shadow duration-300"
             size="large"
+            disabled={!currentUser || loading} // Disable if not logged in or loading
           >
             写新消息给管理员
           </Button>
@@ -116,6 +114,8 @@ const CustomerMessagePage = () => {
                 setReceivedMessages={setReceivedMessages}
                 setSelectedReceivedMessage={setSelectedReceivedMessage}
                 setIsViewReceivedModalVisible={setIsViewReceivedModalVisible}
+                currentUserId={currentUser?.id || -1} // Pass current user ID
+                loading={loading}
               />
             </div>
           </TabPane>
@@ -133,6 +133,7 @@ const CustomerMessagePage = () => {
                 sentMessages={sentMessages}
                 setSelectedSentMessage={setSelectedSentMessage}
                 setIsViewSentModalVisible={setIsViewSentModalVisible}
+                loading={loading} // Pass loading state
               />
             </div>
           </TabPane>
@@ -159,12 +160,15 @@ const CustomerMessagePage = () => {
         />
       )}
 
-      <CusSendMessage
-        isNewMessageModalVisible={isNewMessageModalVisible}
-        setIsNewMessageModalVisible={setIsNewMessageModalVisible}
-        setSentMessages={setSentMessages}
-        sentMessages={sentMessages}
-      />
+      {/* Conditionally render CusSendMessage only if currentUser is available */}
+      {currentUser && (
+        <CusSendMessage
+          isNewMessageModalVisible={isNewMessageModalVisible}
+          setIsNewMessageModalVisible={setIsNewMessageModalVisible}
+          setSentMessages={setSentMessages}
+          currentUserId={currentUser.id} // Pass the current user's ID
+        />
+      )}
     </div>
   );
 };

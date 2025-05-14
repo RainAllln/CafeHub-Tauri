@@ -1,26 +1,19 @@
 import { EyeOutlined } from '@ant-design/icons';
-import { Button, Table, Tag } from 'antd'
-import React from 'react'
-
-interface Message {
-  id: number;
-  sender_id: number;
-  receiver_id: number; // For received messages, this is the Admin's ID
-  title: string;
-  message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
-}
+import { Button, Table, Tag } from 'antd';
+import React from 'react';
+import type { Message } from '@/api/message'; // Import Message type
 
 interface CustomerSentBoxProps {
   sentMessages: Message[];
   setSelectedSentMessage: React.Dispatch<React.SetStateAction<Message | null>>;
   setIsViewSentModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  loading: boolean; // Add loading prop
 }
 const CustomerSentBox: React.FC<CustomerSentBoxProps> = ({
   sentMessages,
   setSelectedSentMessage,
   setIsViewSentModalVisible,
+  loading, // Destructure loading prop
 }) => {
 
   const handleViewSentMessage = (message: Message) => {
@@ -29,6 +22,12 @@ const CustomerSentBox: React.FC<CustomerSentBoxProps> = ({
   };
 
   const sentMessagesColumns = [
+    {
+      title: '收件人', // Assuming admin is the receiver
+      dataIndex: 'receiver_username',
+      key: 'receiver_username',
+      render: (username: string) => username || '管理员', // Fallback if username is not available
+    },
     {
       title: '标题',
       dataIndex: 'title',
@@ -80,6 +79,8 @@ const CustomerSentBox: React.FC<CustomerSentBoxProps> = ({
       pagination={{ pageSize: 5, showSizeChanger: false }}
       className="shadow-sm rounded-md overflow-hidden"
       scroll={{ x: 'max-content' }}
+      loading={loading} // Pass loading state to Table
+      locale={{ emptyText: loading ? '加载中...' : '暂无已发送消息' }}
     />
   )
 }

@@ -1,75 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Table, Button, Tag, Typography, message, Radio } from 'antd'; // Added Radio
 import MessageContent from '@/components/MessageContent';
 import AdminReplyModal from '@/components/AdminReplyModal';
 import AdminReciveBox from '@/components/AdminReciveBox';
 import AdminSentBox from '@/components/AdminSentBox';
+import { fetchReceivedMessages, fetchSentMessages } from '@/api/message';
 
 const { Title } = Typography;
 
 interface Message {
   id: number;
   sender_id: number;
-  receiver_id: number; // For received messages, this is the Admin's ID
+  receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
+  read_status: 0 | 1;
 }
 
 const ADMIN_ID = 1; // Assuming Admin's ID is 1
 
-// Mock data for received messages
-const mockMessages: Message[] = [
-  {
-    id: 1,
-    sender_id: 101,
-    receiver_id: ADMIN_ID,
-    title: 'Regarding recent order #12345',
-    message_content: 'Hello Admin, I have a query regarding my recent order #12345. The delivery status has not been updated for 3 days. Could you please look into this? Thanks.',
-    send_date: '2025-05-08',
-    read_status: 0,
-  },
-  {
-    id: 2,
-    sender_id: 102,
-    receiver_id: ADMIN_ID,
-    title: 'Feedback on new product feature',
-    message_content: 'Hi Admin, I wanted to share some feedback on the new product feature launched last week. It\'s great, but I think adding a customizable dashboard would be even better. Keep up the good work!',
-    send_date: '2025-05-07',
-    read_status: 1,
-  },
-  {
-    id: 3,
-    sender_id: 103,
-    receiver_id: ADMIN_ID,
-    title: 'Account password reset request',
-    message_content: 'Dear Admin, I am unable to reset my account password. The reset link seems to be expired. Can you please assist me with this issue? My username is user103.',
-    send_date: '2025-05-09',
-    read_status: 0,
-  },
-  {
-    id: 4,
-    sender_id: 103,
-    receiver_id: ADMIN_ID,
-    title: 'Account password reset request',
-    message_content: 'Dear Admin, I am unable to reset my account password. The reset link seems to be expired. Can you please assist me with this issue? My username is user103.',
-    send_date: '2025-05-09',
-    read_status: 0,
-  },
-  {
-    id: 5,
-    sender_id: 103,
-    receiver_id: ADMIN_ID,
-    title: 'Account password reset request',
-    message_content: 'Dear Admin, I am unable to reset my account password. The reset link seems to be expired. Can you please assist me with this issue? My username is user103.',
-    send_date: '2025-05-09',
-    read_status: 0,
-  },
-];
-
 const AdminMessagePage = () => {
-  const [messages, setMessages] = useState<Message[]>(mockMessages);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
 
@@ -77,6 +31,28 @@ const AdminMessagePage = () => {
   const [replyingToMessage, setReplyingToMessage] = useState<Message | null>(null);
   const [adminSentMessages, setAdminSentMessages] = useState<Message[]>([]);
   const [currentView, setCurrentView] = useState<'inbox' | 'sent'>('inbox'); // New state for view toggle
+  const [loading, setLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    const loadMessages = async () => {
+      setLoading(true);
+      try {
+        if (currentView === 'inbox') {
+          const received = await fetchReceivedMessages(ADMIN_ID);
+          setMessages(received);
+        } else if (currentView === 'sent') {
+          const sent = await fetchSentMessages(ADMIN_ID);
+          setAdminSentMessages(sent);
+        }
+      } catch (error) {
+        message.error(`加载消息失败: ${error}`);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadMessages();
+  }, [currentView]); // Reload messages when currentView changes
 
   const handleCloseReplyModal = () => {
     setIsReplyModalVisible(false);
@@ -107,6 +83,7 @@ const AdminMessagePage = () => {
           setIsModalVisible={setIsModalVisible}
           setIsReplyModalVisible={setIsReplyModalVisible}
           setReplyingToMessage={setReplyingToMessage}
+          loading={loading}
         />
       )}
 
@@ -115,6 +92,7 @@ const AdminMessagePage = () => {
           adminSentMessages={adminSentMessages}
           setSelectedMessage={setSelectedMessage}
           setIsMessageModalVisible={setIsModalVisible}
+          loading={loading}
         />
       )}
 
@@ -127,7 +105,7 @@ const AdminMessagePage = () => {
         />
       )}
 
-      {replyingToMessage && (
+      {/* {replyingToMessage && (
         <AdminReplyModal
           visible={isReplyModalVisible}
           recipientId={replyingToMessage.sender_id}
@@ -136,7 +114,7 @@ const AdminMessagePage = () => {
           setAdminSentMessages={setAdminSentMessages}
           handleCloseReplyModal={handleCloseReplyModal}
         />
-      )}
+      )} */}
 
     </div>
   );

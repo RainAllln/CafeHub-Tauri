@@ -7,20 +7,24 @@ interface Message {
   id: number;
   sender_id: number;
   receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
   read_status: 0 | 1;
 }
 
 interface AdminSentMessage {
   id: number;
-  sender_id: number;    // Admin's ID
-  receiver_id: number;  // User's ID (original sender)
+  sender_id: number;
+  receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by user, 1: Read by user (for future use)
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
+  read_status: 0 | 1;
 }
 
 interface MessageContentProps {

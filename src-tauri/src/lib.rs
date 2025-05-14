@@ -134,7 +134,6 @@ struct MessageInfo {
     message_content: String,
     send_date: Option<NaiveDate>,
     read_status: i8, // 0: Unread, 1: Read
-    is_sender: bool, // True if the current user is the sender of this message
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -1167,7 +1166,7 @@ fn send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Result<String
 }
 
 #[tauri::command]
-fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
+fn get_sent_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
     let mut conn = mysql_pool
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
@@ -1181,8 +1180,7 @@ fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<Messag
         FROM message m
         JOIN account s_acc ON m.sender_id = s_acc.id
         JOIN account r_acc ON m.receiver_id = r_acc.id
-        WHERE m.sender_id = :user_id OR m.receiver_id = :user_id
-        ORDER BY m.send_date DESC, m.id DESC";
+        WHERE m.sender_id = :user_id";
 
     let results: Vec<MessageInfo> = conn
         .exec_map(
@@ -1209,11 +1207,60 @@ fn get_user_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<Messag
                     message_content,
                     send_date,
                     read_status,
-                    is_sender: sender_id_db == user_id,
                 }
             },
         )
-        .map_err(|e| format!("Database query failed for user messages: {}", e))?;
+        .map_err(|e| format!("Database query failed for sent messages: {}", e))?;
+
+    Ok(results)
+}
+
+#[tauri::command]
+fn get_recived_messages(user_id: i64, mysql_pool: State<Pool>) -> Result<Vec<MessageInfo>, String> {
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let query = "
+        SELECT
+            m.id, m.sender_id, m.receiver_id,
+            s_acc.username AS sender_username,
+            r_acc.username AS receiver_username,
+            m.title, m.message_content, m.send_date, m.read_status
+        FROM message m
+        JOIN account s_acc ON m.sender_id = s_acc.id
+        JOIN account r_acc ON m.receiver_id = r_acc.id
+        WHERE m.receiver_id = :user_id";
+
+    let results: Vec<MessageInfo> = conn
+        .exec_map(
+            query,
+            params! { "user_id" => user_id },
+            |(
+                id,
+                sender_id_db,
+                receiver_id_db,
+                sender_username,
+                receiver_username,
+                title,
+                message_content,
+                send_date,
+                read_status,
+            )| {
+                MessageInfo {
+                    id,
+                    sender_id: sender_id_db,
+                    receiver_id: receiver_id_db,
+                    sender_username,
+                    receiver_username,
+                    title,
+                    message_content,
+                    send_date,
+                    read_status,
+                }
+            },
+        )
+        .map_err(|e| format!("Database query failed for recieved messages: {}", e))?;
 
     Ok(results)
 }
@@ -1313,7 +1360,8 @@ pub fn run() {
             report_lost_item,
             claim_lost_item,
             send_message,
-            get_user_messages,
+            get_sent_messages,
+            get_recived_messages,
             mark_message_as_read,
             get_all_users,
             recharge_balance

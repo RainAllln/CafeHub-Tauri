@@ -5,11 +5,13 @@ import React from 'react'
 interface Message {
   id: number;
   sender_id: number;
-  receiver_id: number; // For received messages, this is the Admin's ID
+  receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
+  read_status: 0 | 1;
 }
 
 interface AdminReciveBoxProps {
@@ -19,6 +21,7 @@ interface AdminReciveBoxProps {
   setIsModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setIsReplyModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
   setReplyingToMessage: React.Dispatch<React.SetStateAction<Message | null>>;
+  loading: boolean;
 }
 
 const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
@@ -28,7 +31,8 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
     setSelectedMessage,
     setIsModalVisible,
     setIsReplyModalVisible,
-    setReplyingToMessage
+    setReplyingToMessage,
+    loading,
   }
 ) => {
 
@@ -53,9 +57,9 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
   const receivedMessagesColumns = [
     {
       title: '用户名',
-      dataIndex: 'sender_id',
-      key: 'sender_name',
-      render: (sender_id: number) => `User ${sender_id}`,
+      dataIndex: 'sender_username',
+      key: 'sender_username',
+      render: (sender_username: string) => `${sender_username}`,
     },
     {
       title: '标题',
@@ -123,6 +127,8 @@ const AdminReciveBox: React.FC<AdminReciveBoxProps> = (
         className="bg-white shadow-lg rounded-lg"
         pagination={{ pageSize: 5 }}
         scroll={{ x: 'max-content' }}
+        loading={loading} // Added loading state to table
+        locale={{ emptyText: loading ? '加载中...' : '暂无收到消息' }}
       />
     </div>
   )

@@ -6,23 +6,27 @@ import React from 'react'
 interface Message {
   id: number;
   sender_id: number;
-  receiver_id: number; // For received messages, this is the Admin's ID
+  receiver_id: number;
+  sender_username: string;
+  receiver_username: string;
   title: string;
   message_content: string;
-  send_date: string;
-  read_status: 0 | 1; // 0: Unread by admin, 1: Read by admin
+  send_date: string; // Assuming NaiveDate is serialized to YYYY-MM-DD string or null
+  read_status: 0 | 1;
 }
 
 interface AdminSentBoxProps {
   adminSentMessages: Message[];
   setSelectedMessage: React.Dispatch<React.SetStateAction<Message | null>>;
   setIsMessageModalVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  loading: boolean;
 }
 
 const AdminSentBox: React.FC<AdminSentBoxProps> = ({
   adminSentMessages,
   setSelectedMessage,
   setIsMessageModalVisible,
+  loading,
 }) => {
 
   const handleViewMessage = (message: Message) => {
@@ -34,9 +38,9 @@ const AdminSentBox: React.FC<AdminSentBoxProps> = ({
   const sentMessagesColumns = [
     {
       title: '接收用户名',
-      dataIndex: 'receiver_id',
-      key: 'receiver_name',
-      render: (receiver_id: number) => `User ${receiver_id}`,
+      dataIndex: 'receiver_username',
+      key: 'receiver_username',
+      render: (receiver_username: string) => `${receiver_username}`,
     },
     {
       title: '标题',
@@ -89,6 +93,7 @@ const AdminSentBox: React.FC<AdminSentBoxProps> = ({
         pagination={{ pageSize: 5 }}
         locale={{ emptyText: '暂无已发送消息' }}
         scroll={{ x: 'max-content' }}
+        loading={loading}
       />
     </div>
   )

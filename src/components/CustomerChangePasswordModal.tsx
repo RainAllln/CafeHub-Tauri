@@ -1,6 +1,6 @@
 // src/components/customer/CustomerChangePasswordModal.tsx
 import React from 'react';
-import { Modal, Form, Input, Button, message } from 'antd';
+import { Modal, Form, Input, message } from 'antd';
 import { invoke } from '@tauri-apps/api/core';
 
 interface CustomerChangePasswordModalProps {

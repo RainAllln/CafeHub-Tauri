@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Button, Card, Col, Row, FloatButton, Typography, Divider, message, Spin } from 'antd';
+import { useState, useEffect } from 'react';
+import { Col, Row, FloatButton, Typography, Divider, message, Spin } from 'antd';
 import { ShoppingCartOutlined } from '@ant-design/icons';
 import Cart from '../components/Cart';
 import ProductInfo from '@/components/ProductInfo';

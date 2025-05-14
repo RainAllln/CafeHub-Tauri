@@ -1,6 +1,5 @@
 import React from 'react'
 import CoffeeSvg from '@/assets/coffee.svg?react';
-import Icon from '@ant-design/icons';
 
 interface WebTitleProps {
   collapsed: boolean;

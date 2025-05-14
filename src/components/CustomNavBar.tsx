@@ -1,5 +1,5 @@
 import React from 'react';
-import { TransactionOutlined, TeamOutlined, InboxOutlined, RestOutlined, MailOutlined, BarChartOutlined, LogoutOutlined } from '@ant-design/icons';
+import { TransactionOutlined, InboxOutlined, RestOutlined, MailOutlined, LogoutOutlined } from '@ant-design/icons';
 import type { MenuProps } from 'antd';
 import { Menu } from 'antd';
 import { Link } from 'react-router-dom';

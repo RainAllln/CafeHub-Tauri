@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Table, Button, Tag, Space, message } from 'antd';
 import type { TableProps } from 'antd';
 import ReportLost from '@/components/ReportLost';
 import { getAllLostItems, LostItem as ApiLostItem, claimLostItem } from '../api/lost';
-import { invoke } from '@tauri-apps/api/core';
 import type { Account } from '../api/user'; // Added import for Account type
 
 // Helper function to get user ID - updated based on CustomerInfoPage.tsx

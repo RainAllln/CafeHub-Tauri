@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Added useEffect
+import { useState, useEffect } from 'react'; // Added useEffect
 import { Button, Typography, Tabs, message as AntMessage } from 'antd'; // Renamed message to AntMessage
 import { SendOutlined, InboxOutlined, MailOutlined } from '@ant-design/icons';
 import CusSendMessage from '@/components/CusSendMessage';

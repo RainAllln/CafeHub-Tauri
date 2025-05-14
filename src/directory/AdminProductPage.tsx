@@ -132,9 +132,7 @@ const AdminProductPage = () => {
     },
   ];
 
-  const [editingKey, setEditingKey] = useState('');
   const cancel = () => {
-    setEditingKey('');
   };
 
   const tableLocale = {

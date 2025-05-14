@@ -31,7 +31,6 @@ const Cart: React.FC<CartProps> = ({
   setCart,
   products,
   setIsCartDrawerVisible,
-  setProducts,
   isCartDrawerVisible,
   userId, // Destructure userId
   onPurchaseSuccess, // Destructure callback

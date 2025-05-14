@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { Card, InputNumber, Button, Form, message, Typography } from 'antd';
 import { PropertySafetyOutlined, DollarCircleOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/core';
-import type { Account } from '@/api/user'; // 假设 Account 类型定义在这里或 types 文件夹
 
 // 如果 Account 类型也包含 balance，可以复用，否则定义一个简单类型
 // interface AccountForBalance {
@@ -54,8 +53,8 @@ const CustomerRechargeCard: React.FC<CustomerRechargeCardProps> = ({ userId, cur
       // 更新余额的逻辑：
       // 将 currentBalance 安全地转换为数字
       const numericCurrentBalance = (currentBalance === null || currentBalance === undefined || currentBalance === '')
-                                      ? 0
-                                      : Number(currentBalance);
+        ? 0
+        : Number(currentBalance);
 
       if (isNaN(numericCurrentBalance)) {
         console.warn("Current balance was NaN after conversion. Using 0 for new balance calculation.");
@@ -75,8 +74,8 @@ const CustomerRechargeCard: React.FC<CustomerRechargeCardProps> = ({ userId, cur
 
   // 安全地将 currentBalance 转换为数字用于显示，如果无效则显示 0.00
   const displayBalanceValue = (currentBalance === null || currentBalance === undefined || currentBalance === '')
-                              ? 0
-                              : Number(currentBalance);
+    ? 0
+    : Number(currentBalance);
   const formattedDisplayBalance = isNaN(displayBalanceValue) ? '0.00' : displayBalanceValue.toFixed(2);
 
 

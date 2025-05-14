@@ -3,8 +3,8 @@ import WebTitle from '@/icon/WebTitle';
 import { ConfigProvider, Layout } from 'antd'
 import { Content } from 'antd/es/layout/layout';
 import Sider from 'antd/es/layout/Sider';
-import React, { useEffect, useState } from 'react'
-import { Outlet, useNavigate } from 'react-router'
+import { useState } from 'react'
+import { Outlet } from 'react-router'
 /**
  * 左侧导航栏，中间部分设置各页面
  * 一级路由是LayoutPage，二级路由是各个页面
@@ -12,21 +12,8 @@ import { Outlet, useNavigate } from 'react-router'
  */
 
 const LayoutPage = () => {
-  const navigate = useNavigate()
-
-
   const [collapsed, setCollapsed] = useState(false);
   const siderWidth = collapsed ? 80 : 200; // Ant Design default Sider widths
-  // useEffect(
-  //   () => {
-  //     const isAuthenticated = localStorage.getItem('isAuthenticated');
-  //     if (!isAuthenticated) {
-  //       // 如果没有登录，跳转到登录页面
-  //       navigate('/');
-  //     }
-  //   },
-  //   [navigate]
-  // );
 
   return (
     <ConfigProvider

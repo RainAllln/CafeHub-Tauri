@@ -1,6 +1,6 @@
 // src/components/customer/CustomerEditProfileModal.tsx
 import React, { useEffect } from 'react';
-import { Modal, Form, Input, Select, Button, message } from 'antd';
+import { Modal, Form, Input, Select, message } from 'antd';
 import { invoke } from '@tauri-apps/api/core';
 import type { Account } from '@/api/user';
 
@@ -39,7 +39,7 @@ const CustomerEditProfileModal: React.FC<CustomerEditProfileModalProps> = ({
       });
     }
     if (!visible) {
-        form.resetFields();
+      form.resetFields();
     }
   }, [currentUser, visible, form]);
 
@@ -66,12 +66,12 @@ const CustomerEditProfileModal: React.FC<CustomerEditProfileModalProps> = ({
     // 如果 values.phone 是 undefined (用户没碰过输入框) 且 currentUser.phone 是 null/undefined，不视为更改
     // 如果 values.phone 是 "" 且 currentUser.phone 不是 "", 视为更改 (清空)
     if (values.phone !== currentUser.phone) {
-        if (values.phone === undefined && (currentUser.phone === null || currentUser.phone === undefined)) {
-            // 视为未更改
-        } else {
-            payload.phone = values.phone ? values.phone.trim() : null; // 如果为空字符串或 undefined，则设为 null
-            changed = true;
-        }
+      if (values.phone === undefined && (currentUser.phone === null || currentUser.phone === undefined)) {
+        // 视为未更改
+      } else {
+        payload.phone = values.phone ? values.phone.trim() : null; // 如果为空字符串或 undefined，则设为 null
+        changed = true;
+      }
     }
 
 
@@ -137,20 +137,17 @@ const CustomerEditProfileModal: React.FC<CustomerEditProfileModalProps> = ({
           name="phone"
           label="手机号码"
           rules={[
-            // 根据你的需求调整手机号校验规则，例如只校验长度或允许为空
-            // 当前规则为：如果是国内手机号格式，则必须是11位且以1[3-9]开头
-            // 如果允许不填，则不应该有 required: true
-             (formInstance) => ({
-                validator(_, value) {
-                  if (!value || value.trim() === "") { // 允许为空
-                    return Promise.resolve();
-                  }
-                  if (/^1[3-9]\d{9}$/.test(value)) { // 如果有值，则校验格式
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('请输入有效的11位手机号码!'));
-                },
-              })
+            () => ({
+              validator(_, value) {
+                if (!value || value.trim() === "") { // 允许为空
+                  return Promise.resolve();
+                }
+                if (/^1[3-9]\d{9}$/.test(value)) { // 如果有值，则校验格式
+                  return Promise.resolve();
+                }
+                return Promise.reject(new Error('请输入有效的11位手机号码!'));
+              },
+            })
           ]}
         >
           <Input placeholder="请输入手机号码 (11位，可留空)" maxLength={11} />

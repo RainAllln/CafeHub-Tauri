@@ -18,6 +18,13 @@ const AdminGoodsShareChart: React.FC<AdminGoodsShareChartProps> = ({ data }) => 
     colorField: 'goods_name',
     radius: 0.8,
     height: 300,
+    tooltip: {
+      title:
+        { field: 'goods_name', valueFormatter: (goods_name: string) => { return `商品名：${goods_name}` } },
+      items: [
+        { name: '商品消费额', field: 'amount', valueFormatter: (amount: number) => { return `￥${amount}` } }
+      ]
+    },
     label: {
       type: 'outer' as const, // 'outer' 类型标签通常更易读
       // content: '{name}\n¥{value}', // 显示名称和数值

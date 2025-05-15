@@ -9,8 +9,6 @@ interface AdminGoodsShareChartProps {
 }
 
 const AdminGoodsShareChart: React.FC<AdminGoodsShareChartProps> = ({ data }) => {
-  console.log("--- AdminGoodsShareChart Debug ---");
-  console.log("Received data prop in AdminGoodsShareChart:", JSON.stringify(data, null, 2));
   const pieConfig = {
     appendPadding: 10,
     data: data,

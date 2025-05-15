@@ -26,19 +26,19 @@ const LoginPage = () => {
         localStorage.setItem('loginAccount', JSON.stringify(account));
         localStorage.setItem('isAuthenticated', 'true');
         if (account.user_type === 0) {
-            navigate('/admin');
+          navigate('/admin');
         } else if (account.user_type === 1) {
-            navigate('/customer');
+          navigate('/customer');
         } else {
-           console.error("Unknown user type:", account.user_type);
-           messageApi.open({
-               type: 'error',
-               content: '未知的用户类型',
-               duration: 2,
-           });
+          console.error("Unknown user type:", account.user_type);
+          messageApi.open({
+            type: 'error',
+            content: '未知的用户类型',
+            duration: 2,
+          });
         }
       } else {
-        console.log('登录失败 (API返回null或发生错误)');
+        console.error('登录失败 (API返回null或发生错误)');
         messageApi.open({
           type: 'error',
           content: '账号或密码错误，或登录服务暂时不可用',

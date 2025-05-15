@@ -9,21 +9,19 @@ CafeHub is a desktop application built with Tauri, React, TypeScript, and Rust, 
 ## Features
 
 - **Customer Interface:**
-  - Browse products
-  - Place orders
-  - Manage account (balance, order history, profile)
-  - Report lost items
-  - Send and receive messages
+  - View and edit personal information
+  - Browse and purchase products
+  - Report and claim lost items
+  - Send messages to administrator
 - **Administrator Interface:**
-  - Manage products (add, edit, view)
-  - View sales statistics and charts
-  - Manage user accounts
-  - Handle lost and found items
-  - Communicate with customers
+  - View Business Performance
+  - Manage products
+  - View lost and found items
+  - Respond to customer messages
 
 ## Technology Stack
 
-- **Frontend:** React, TypeScript
+- **Frontend:** React, TypeScript, Vite
 - **Backend:** Rust
 - **Framework:** Tauri
 - **Database:** MySQL

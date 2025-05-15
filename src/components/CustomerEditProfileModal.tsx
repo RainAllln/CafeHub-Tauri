@@ -92,8 +92,6 @@ const CustomerEditProfileModal: React.FC<CustomerEditProfileModalProps> = ({
       return;
     }
 
-    console.log("Payload to send for profile update:", payload); // 调试日志
-
     setLoading(true);
     try {
       await invoke<string>('update_user_details', {

@@ -26,27 +26,18 @@ const AdminInfoPage: React.FC = () => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-      console.log("--- AdminInfoPage: fetchData started ---");
 
       try {
-        console.log("Attempting to get_total_users...");
         const totalUsersData = await getTotalUsers();
-        console.log("Raw totalUsersData:", totalUsersData);
         setTotalUsers(totalUsersData);
 
-        console.log("Attempting to get_new_users_this_month...");
         const newUsersData = await getNewUsersThisMonth();
-        console.log("Raw newUsersData:", newUsersData);
         setNewUsersThisMonth(newUsersData);
 
-        console.log("Attempting to get_monthly_consumption_summary...");
         const monthlyConsumptionData = await getAdminMonthlyConsumptionSummary();
-        console.log("Raw monthlyConsumptionData:", JSON.stringify(monthlyConsumptionData, null, 2));
         setMonthlyConsumption(monthlyConsumptionData);
 
-        console.log("Attempting to get_goods_consumption_share_current_month...");
         const goodsShareData = await getGoodsConsumptionShareCurrentMonth();
-        console.log("Raw goodsShareData from backend (useEffect):", JSON.stringify(goodsShareData, null, 2));
         setGoodsShare(goodsShareData);
 
       } catch (err) {
@@ -60,7 +51,6 @@ const AdminInfoPage: React.FC = () => {
         }
       } finally {
         setLoading(false);
-        console.log("--- AdminInfoPage: fetchData finished ---");
       }
     };
 
@@ -75,8 +65,6 @@ const AdminInfoPage: React.FC = () => {
     console.error("AdminInfoPage rendering error state:", error);
     return <div style={{ textAlign: 'center', marginTop: '50px', color: 'red' }}>{error}</div>;
   }
-
-  console.log("AdminInfoPage: Rendering with goodsShare:", JSON.stringify(goodsShare, null, 2));
 
   return (
     <div style={{ padding: '24px', background: '#f0f2f5', minHeight: 'calc(100vh - 64px)' }}>

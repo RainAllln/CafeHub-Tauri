@@ -37,15 +37,11 @@ const CustomerInfoPage: React.FC = () => {
       if (!userId) {
         throw new Error("无法获取用户ID。");
       }
-      console.log(`CustomerInfoPage: Fetching data for userId: ${userId}`);
 
       const [detailsData, consumptionData] = await Promise.all([
         getUserDetails(userId), // <-- 使用新的 API 函数
         getUserMonthlyConsumption(userId) // <-- 使用新的 API 函数
       ]);
-
-      console.log("CustomerInfoPage: Raw detailsData from backend:", JSON.stringify(detailsData, null, 2));
-      console.log("CustomerInfoPage: Raw consumptionData from backend:", JSON.stringify(consumptionData, null, 2));
 
       setAccount(detailsData);
       setMonthlyConsumption(consumptionData); // 后端已处理 Number 转换

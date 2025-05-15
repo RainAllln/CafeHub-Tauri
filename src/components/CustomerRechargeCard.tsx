@@ -42,8 +42,6 @@ const CustomerRechargeCard: React.FC<CustomerRechargeCardProps> = ({ userId, cur
         data: rechargeDataForRust
       };
 
-      console.log("Calling 'recharge_balance' with payload:", JSON.stringify(payloadForInvoke, null, 2)); // 调试日志
-
       // 调用后端的 recharge_balance 命令
       const resultMessage = await invoke<string>('recharge_balance', payloadForInvoke);
 

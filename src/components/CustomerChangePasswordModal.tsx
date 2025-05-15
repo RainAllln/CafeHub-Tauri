@@ -40,8 +40,6 @@ const CustomerChangePasswordModal: React.FC<CustomerChangePasswordModalProps> = 
         data: updatePasswordPayloadForRust  // 对应 Rust 函数的第二个参数 data
       };
 
-      console.log("Calling 'update_user_password' with payload:", JSON.stringify(payloadForInvoke, null, 2)); // 调试日志
-
       await invoke<string>('update_user_password', payloadForInvoke);
 
       message.success('密码修改成功！');

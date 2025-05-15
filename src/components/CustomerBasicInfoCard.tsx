@@ -8,8 +8,8 @@ interface CustomerBasicInfoCardProps {
 }
 
 const renderGender = (gender?: number | null) => {
-  if (gender === 0) return <><ManOutlined style={{color: '#1890ff'}}/> 男</>;
-  if (gender === 1) return <><WomanOutlined style={{color: '#eb2f96'}}/> 女</>;
+  if (gender === 0) return <><ManOutlined style={{ color: '#1890ff' }} /> 男</>;
+  if (gender === 1) return <><WomanOutlined style={{ color: '#eb2f96' }} /> 女</>;
   return '未设置';
 };
 

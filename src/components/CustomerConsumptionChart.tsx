@@ -10,8 +10,6 @@ interface CustomerConsumptionChartProps {
 }
 
 const CustomerConsumptionChart: React.FC<CustomerConsumptionChartProps> = ({ data }) => {
-  console.log("--- CustomerConsumptionChart Debug ---"); // 添加日志
-  console.log("Received data prop in CustomerConsumptionChart:", JSON.stringify(data, null, 2));
 
   const lineConfig = {
     data: data,

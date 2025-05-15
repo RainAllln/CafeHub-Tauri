@@ -1,5 +1,7 @@
 # CafeHub - Self-Service Cafe Management System
 
+[![Windows](https://img.shields.io/badge/platform-Windows-blue)](https://www.microsoft.com/windows) [![Rust](https://img.shields.io/badge/language-Rust-orange)](https://www.rust-lang.org/) [![Tauri](https://img.shields.io/badge/framework-Tauri-green)](https://tauri.app/) [![React](https://img.shields.io/badge/library-React-blue)](https://reactjs.org/) [![MySQL](https://img.shields.io/badge/database-MySQL-blue)](https://www.mysql.com/) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/RainAllln/CafeHub-Tauri)
+
 This is a software engineering course project for a self-service cafe management system.
 
 ## Project Overview

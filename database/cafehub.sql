@@ -1,7 +1,7 @@
 CREATE TABLE account (
     id BIGINT PRIMARY KEY AUTO_INCREMENT,
     username VARCHAR(20) UNIQUE NOT NULL,
-    password VARCHAR(20) NOT NULL,
+    password VARCHAR(255) NOT NULL, -- Increased length for hashed passwords
     phone VARCHAR(50),
     gender TINYINT CHECK (gender IN (0, 1)), -- 0: Male, 1: Female
     join_time DATE,

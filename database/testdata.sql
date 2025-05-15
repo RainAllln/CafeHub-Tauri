@@ -1,13 +1,15 @@
 INSERT INTO account (id, username, password, phone, gender, join_time, balance, user_type)
-VALUES (1, 'admin', '123456', NULL, NULL, NULL, NULL, 0);
+VALUES (1, 'admin', '$2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK', NULL, NULL, NULL, NULL, 0);
 
 INSERT INTO account (username, password, phone, gender, join_time, balance, user_type)
 VALUES 
-('user1', '123456', '13900139001', 1, '2024-10-05', 100.00, 1),
-('user2', '123456', '13900139002', 0, '2024-12-12', 50.00, 1),
-('user3', '123456', '13900139003', 0, '2025-01-13', 75.50, 1),
-('user4', '123456', '13900139004', 1, '2025-03-22', 200.00, 1),
-('user5', '123456', '13900139005', 0, '2025-05-13', 30.25, 1);
+('user1', '$2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK', '13900139001', 1, '2024-10-05', 100.00, 1),
+('user2', '$2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK', '13900139002', 0, '2024-12-12', 50.00, 1),
+('user3', '$2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK', '13900139003', 0, '2025-01-13', 75.50, 1),
+('user4', '$2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK', '13900139004', 1, '2025-03-22', 200.00, 1),
+('user5', '$2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK', '13900139005', 0, '2025-05-13', 30.25, 1);
+
+-- password: 123456 ($2b$12$d9n2xF3hslElNuQAqrln/OeEeYRLnMZIOwvnlpqns5uwr92Wq65yK)
 
 INSERT INTO goods (goods_name, goods_type, stock, price) VALUES
 ('意式浓缩', '咖啡类', 50, 18.00),

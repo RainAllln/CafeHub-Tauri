@@ -1,4 +1,5 @@
 use crate::models::*;
+use bcrypt::{hash, verify, DEFAULT_COST};
 use chrono::{Datelike, Local, NaiveDate};
 use mysql::{params, prelude::Queryable, Error as MySQLError, Pool};
 use rust_decimal::Decimal;
@@ -13,23 +14,48 @@ pub fn login(
     let mut conn = mysql_pool
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
-    let result: Result<Option<(i64, String, Option<String>, Option<i8>, Option<NaiveDate>, Option<Decimal>, i8)>, mysql::Error> = conn.exec_first("SELECT id, username, phone, gender, join_time, balance, user_type FROM account WHERE username = :username AND password = :password", params! {"username" => &username, "password" => &password,});
+
+    let result: Result<Option<(i64, String, String, Option<String>, Option<i8>, Option<NaiveDate>, Option<Decimal>, i8)>, mysql::Error> =
+        conn.exec_first(
+            "SELECT id, username, password, phone, gender, join_time, balance, user_type FROM account WHERE username = :username",
+            params! {"username" => &username},
+        );
+
     match result {
-        Ok(Some((id, uname, phone, gender, join_time, balance, user_type))) => {
-            let account = Account {
-                id,
-                username: uname,
-                phone,
-                gender,
-                join_time,
-                balance,
-                user_type,
-            };
-            println!("Login successful for user: {}", username);
-            Ok(account)
+        Ok(Some((
+            id,
+            uname,
+            stored_hashed_password,
+            phone,
+            gender,
+            join_time,
+            balance,
+            user_type,
+        ))) => {
+            let valid_password = verify(&password, &stored_hashed_password).map_err(|e| {
+                eprintln!("Password verification error for user {}: {}", username, e);
+                "Password verification process failed".to_string()
+            })?;
+
+            if valid_password {
+                let account = Account {
+                    id,
+                    username: uname,
+                    phone,
+                    gender,
+                    join_time,
+                    balance,
+                    user_type,
+                };
+                println!("Login successful for user: {}", username);
+                Ok(account)
+            } else {
+                println!("Login failed for user {}: Invalid password", username);
+                Err("Invalid username or password".to_string())
+            }
         }
         Ok(None) => {
-            println!("Login failed for user: {}", username);
+            println!("Login failed for user {}: User not found", username);
             Err("Invalid username or password".to_string())
         }
         Err(e) => {
@@ -41,22 +67,17 @@ pub fn login(
 
 #[tauri::command]
 pub fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<i32, String> {
-    // Validate username and password are not empty
     if data.username.is_empty() || data.password.is_empty() {
         return Err("Username and password cannot be empty".to_string());
     }
 
-    // Validate gender: 4 means gender is not 0 or 1
     if let Some(gender_val) = data.gender {
         if gender_val != 0 && gender_val != 1 {
             return Ok(4);
         }
     }
 
-    // Validate phone: 3 means the phone number is not 11 digits (and must be all digits)
     if let Some(ref phone_str) = data.phone {
-        // Check if phone_str is not composed of 11 digits.
-        // This means either it contains non-digit characters or its length is not 11.
         if !phone_str.chars().all(|c| c.is_ascii_digit()) || phone_str.len() != 11 {
             return Ok(3);
         }
@@ -66,14 +87,19 @@ pub fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
     let current_date = Local::now().date_naive();
-    let user_type: i8 = 1; // Default user_type, assuming 1 for regular members
-    let default_balance: Decimal = Decimal::new(0, 2); // Default balance
+    let user_type: i8 = 1;
+    let default_balance: Decimal = Decimal::new(0, 2);
+
+    let hashed_password = hash(&data.password, DEFAULT_COST).map_err(|e| {
+        eprintln!("Failed to hash password for user {}: {}", data.username, e);
+        "Password hashing failed".to_string()
+    })?;
 
     let result = conn.exec_drop(
         "INSERT INTO account (username, password, phone, gender, join_time, balance, user_type) VALUES (:username, :password, :phone, :gender, :join_time, :balance, :user_type)",
         params! {
             "username" => &data.username,
-            "password" => &data.password, // Note: Storing passwords in plain text is a security risk. Consider hashing.
+            "password" => &hashed_password,
             "phone" => &data.phone,
             "gender" => &data.gender,
             "join_time" => current_date,
@@ -85,18 +111,100 @@ pub fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<
     match result {
         Ok(_) => {
             println!("Successfully registered user: {}", data.username);
-            Ok(1) // 1 means success
+            Ok(1)
         }
         Err(e) => {
-            eprintln!("Database insert failed for user {}: {}", data.username, e); // Log the raw error
+            eprintln!("Database insert failed for user {}: {}", data.username, e);
             if let MySQLError::MySqlError(ref mysql_err) = e {
                 if mysql_err.code == 1062 {
-                    // MySQL error code for duplicate entry
-                    return Ok(2); // 2 means duplicate user
+                    return Ok(2);
                 }
             }
-            // For other database errors, return a generic error string
             Err(format!("Database error during registration: {}", e))
+        }
+    }
+}
+
+#[tauri::command]
+pub fn update_user_password(
+    user_id: i64,
+    data: UpdatePasswordData,
+    mysql_pool: State<Pool>,
+) -> Result<String, String> {
+    if data.new_password.is_empty() {
+        return Err("New password cannot be empty".to_string());
+    }
+    if data.current_password.is_empty() {
+        return Err("Current password cannot be empty".to_string());
+    }
+
+    let mut conn = mysql_pool
+        .get_conn()
+        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
+
+    let stored_hashed_password_result: Result<Option<String>, mysql::Error> = conn.exec_first(
+        "SELECT password FROM account WHERE id = :user_id AND user_type = 1",
+        params! { "user_id" => user_id },
+    );
+
+    let stored_hashed_password = match stored_hashed_password_result {
+        Ok(Some(hash)) => hash,
+        Ok(None) => {
+            return Err(format!(
+                "User with ID {} not found or is not a customer.",
+                user_id
+            ));
+        }
+        Err(e) => {
+            eprintln!(
+                "Database query failed for current password (ID {}): {}",
+                user_id, e
+            );
+            return Err(format!("Database query failed: {}", e));
+        }
+    };
+
+    let valid_current_password =
+        verify(&data.current_password, &stored_hashed_password).map_err(|e| {
+            eprintln!(
+                "Current password verification error for user ID {}: {}",
+                user_id, e
+            );
+            "Password verification process failed".to_string()
+        })?;
+
+    if !valid_current_password {
+        return Err("Incorrect current password".to_string());
+    }
+
+    let new_hashed_password = hash(&data.new_password, DEFAULT_COST).map_err(|e| {
+        eprintln!("Failed to hash new password for user ID {}: {}", user_id, e);
+        "Password hashing failed".to_string()
+    })?;
+
+    let update_result = conn.exec_drop(
+        "UPDATE account SET password = :new_password WHERE id = :user_id AND user_type = 1",
+        params! {
+            "new_password" => &new_hashed_password,
+            "user_id" => user_id,
+        },
+    );
+
+    match update_result {
+        Ok(_) => {
+            if conn.affected_rows() > 0 {
+                println!("Successfully updated password for user ID: {}", user_id);
+                Ok("Password updated successfully.".to_string())
+            } else {
+                Err("Failed to update password, user not found or no change made.".to_string())
+            }
+        }
+        Err(e) => {
+            eprintln!(
+                "Database password update failed for user ID {}: {}",
+                user_id, e
+            );
+            Err(format!("Database password update failed: {}", e))
         }
     }
 }
@@ -111,7 +219,7 @@ pub fn get_total_users(mysql_pool: State<Pool>) -> Result<i64, String> {
 
     match count {
         Ok(Some(num_users)) => Ok(num_users),
-        Ok(None) => Ok(0), // Should not happen with COUNT(*), but good to handle
+        Ok(None) => Ok(0),
         Err(e) => {
             eprintln!("Database query failed for total users: {}", e);
             Err(format!("Database query failed: {}", e))
@@ -128,7 +236,6 @@ pub fn get_new_users_this_month(mysql_pool: State<Pool>) -> Result<i64, String> 
     let current_year = now.year();
     let current_month_num = now.month();
 
-    // Construct the first day of the current month
     let first_day_current_month = NaiveDate::from_ymd_opt(current_year, current_month_num, 1)
         .ok_or_else(|| "Failed to construct first day of current month".to_string())?;
 
@@ -141,7 +248,7 @@ pub fn get_new_users_this_month(mysql_pool: State<Pool>) -> Result<i64, String> 
 
     match count {
         Ok(Some(num_users)) => Ok(num_users),
-        Ok(None) => Ok(0), // Should not happen with COUNT(*), but good to handle
+        Ok(None) => Ok(0),
         Err(e) => {
             eprintln!("Database query failed for new users this month: {}", e);
             Err(format!("Database query failed: {}", e))
@@ -184,7 +291,6 @@ pub fn get_goods_consumption_share_current_month(
 
     let now = Local::now();
     let current_month_str = now.format("%Y-%m").to_string();
-    // ---- 添加的调试日志 ----
     println!("[RUST DEBUG] get_goods_consumption_share_current_month: Determined current_month_str = '{}'", current_month_str);
 
     let query = "
@@ -201,24 +307,20 @@ pub fn get_goods_consumption_share_current_month(
         |(goods_name, amount_val): (String, Decimal)| GoodsConsumptionShare {
             goods_name,
             amount: amount_val,
-        }, // 明确指定元组类型
+        },
     ) {
         Ok(results) => {
-            // ---- 添加的调试日志 ----
             println!("[RUST DEBUG] get_goods_consumption_share_current_month: Query successful. Results count = {}", results.len());
             if results.is_empty() {
                 println!("[RUST DEBUG] get_goods_consumption_share_current_month: No goods consumption data found for month '{}'", current_month_str);
             } else {
-                // (可选) 打印部分结果内容，帮助调试
                 for (index, item) in results.iter().take(3).enumerate() {
-                    // 最多打印前3条
                     println!("[RUST DEBUG] get_goods_consumption_share_current_month: Result[{}]: Name='{}', Amount='{}'", index, item.goods_name, item.amount);
                 }
             }
             Ok(results)
         }
         Err(e) => {
-            // ---- 现有错误日志 ----
             eprintln!(
                 "[RUST ERROR] Database query failed for current month goods consumption share (month: {}): {}",
                 current_month_str, e
@@ -237,7 +339,6 @@ pub fn get_user_details(user_id: i64, mysql_pool: State<Pool>) -> Result<Account
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // Ensure we are fetching a customer account
     let result: Result<Option<(i64, String, Option<String>, Option<i8>, Option<NaiveDate>, Option<Decimal>, i8)>, mysql::Error> =
         conn.exec_first(
             "SELECT id, username, phone, gender, join_time, balance, user_type FROM account WHERE id = :user_id AND user_type = 1",
@@ -309,7 +410,6 @@ pub fn update_user_details(
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
     let mut set_clauses: Vec<String> = Vec::new();
-    // 改回使用 Vec<(String, mysql::Value)> 来收集参数
     let mut query_params_vec: Vec<(String, mysql::Value)> = Vec::new();
 
     if let Some(uname_val) = &data.username {
@@ -344,13 +444,9 @@ pub fn update_user_details(
     }
 
     if let Some(phone_val) = &data.phone {
-        // 前端会传来 Some("") 或 Some("有效号码") 或 Some(null) -> Option<String>
         if phone_val.is_empty() {
-            // 用户意图清空手机号
             set_clauses.push("phone = NULL".to_string());
-            // 不需要向 query_params_vec 添加，因为 NULL 直接在 SQL 语句中
         } else {
-            // 用户输入了非空手机号
             if !phone_val.chars().all(|c| c.is_ascii_digit()) || phone_val.len() != 11 {
                 return Err("Invalid phone number format. Must be 11 digits.".to_string());
             }
@@ -358,10 +454,8 @@ pub fn update_user_details(
             query_params_vec.push(("phone".to_string(), phone_val.clone().into()));
         }
     }
-    // 如果 data.phone 是 None (前端根本没传这个字段)，则不处理 phone 的更新
 
     if let Some(gender_val) = data.gender {
-        // 前端传来 Some(0), Some(1), 或 Some(null) -> Option<i8>
         if gender_val == 0 || gender_val == 1 {
             set_clauses.push("gender = :gender".to_string());
             query_params_vec.push(("gender".to_string(), gender_val.into()));
@@ -403,73 +497,6 @@ pub fn update_user_details(
 }
 
 #[tauri::command]
-pub fn update_user_password(
-    user_id: i64,
-    data: UpdatePasswordData,
-    mysql_pool: State<Pool>,
-) -> Result<String, String> {
-    if data.new_password.is_empty() {
-        return Err("New password cannot be empty".to_string());
-    }
-
-    let mut conn = mysql_pool
-        .get_conn()
-        .map_err(|e| format!("Failed to get DB connection: {}", e))?;
-
-    let stored_password: Result<Option<String>, mysql::Error> = conn.exec_first(
-        "SELECT password FROM account WHERE id = :user_id AND user_type = 1",
-        params! { "user_id" => user_id },
-    );
-
-    match stored_password {
-        Ok(Some(current_db_password)) => {
-            if current_db_password != data.current_password {
-                return Err("Incorrect current password".to_string());
-            }
-        }
-        Ok(None) => {
-            return Err(format!(
-                "User with ID {} not found or is not a customer.",
-                user_id
-            ))
-        }
-        Err(e) => {
-            eprintln!(
-                "Database query failed for current password (ID {}): {}",
-                user_id, e
-            );
-            return Err(format!("Database query failed: {}", e));
-        }
-    }
-
-    let update_result = conn.exec_drop(
-        "UPDATE account SET password = :new_password WHERE id = :user_id AND user_type = 1",
-        params! {
-            "new_password" => &data.new_password,
-            "user_id" => user_id,
-        },
-    );
-
-    match update_result {
-        Ok(_) => {
-            if conn.affected_rows() > 0 {
-                println!("Successfully updated password for user ID: {}", user_id);
-                Ok("Password updated successfully.".to_string())
-            } else {
-                Err("Failed to update password, user not found or no change made.".to_string())
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "Database password update failed for user ID {}: {}",
-                user_id, e
-            );
-            Err(format!("Database password update failed: {}", e))
-        }
-    }
-}
-
-#[tauri::command]
 pub fn get_all_goods(mysql_pool: State<Pool>) -> Result<Vec<Goods>, String> {
     let mut conn = mysql_pool
         .get_conn()
@@ -492,7 +519,7 @@ pub fn get_all_goods(mysql_pool: State<Pool>) -> Result<Vec<Goods>, String> {
                 index, item.id, &item.goods_name, &item.goods_type, &item.price, &item.stock
             );
             }
-            items // Pass items through for further processing
+            items
         })
         .map_err(|e| format!("Database query failed for all goods: {}", e))?;
 
@@ -512,7 +539,7 @@ pub fn add_goods(data: AddGoodsData, mysql_pool: State<Pool>) -> Result<String, 
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    let stock_value = data.stock.unwrap_or(0); // Default to 0 if not provided
+    let stock_value = data.stock.unwrap_or(0);
 
     let result = conn.exec_drop(
         "INSERT INTO goods (goods_name, goods_type, price, stock) VALUES (:goods_name, :goods_type, :price, :stock)",
@@ -536,7 +563,6 @@ pub fn add_goods(data: AddGoodsData, mysql_pool: State<Pool>) -> Result<String, 
             );
             if let MySQLError::MySqlError(ref mysql_err) = e {
                 if mysql_err.code == 1062 {
-                    // Duplicate entry for unique key (e.g. goods_name if unique)
                     return Err(format!(
                         "Goods with name '{}' already exists.",
                         data.goods_name
@@ -626,7 +652,6 @@ pub fn recharge_balance(
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // Check if the user exists and is a customer
     let user_exists: Option<i8> = conn
         .exec_first(
             "SELECT user_type FROM account WHERE id = :user_id",
@@ -636,7 +661,6 @@ pub fn recharge_balance(
 
     match user_exists {
         Some(1) => {
-            // User is a customer
             let update_result = conn.exec_drop(
                 "UPDATE account SET balance = balance + :amount WHERE id = :user_id AND user_type = 1",
                 params! {
@@ -657,7 +681,6 @@ pub fn recharge_balance(
                             data.amount, data.user_id
                         ))
                     } else {
-                        // Should not happen if user_exists check passed, but good for robustness
                         Err(format!(
                             "Failed to recharge balance for user ID {}. User not found or no change made.",
                             data.user_id
@@ -673,7 +696,7 @@ pub fn recharge_balance(
                 }
             }
         }
-        Some(_) => Err(format!("User with ID {} is not a customer.", data.user_id)), // User is not a customer
+        Some(_) => Err(format!("User with ID {} is not a customer.", data.user_id)),
         None => Err(format!("User with ID {} not found.", data.user_id)),
     }
 }
@@ -697,13 +720,12 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // Start a transaction
     let mut tx = conn
         .start_transaction(mysql::TxOpts::default())
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
     let mut total_purchase_price = Decimal::ZERO;
-    // To store information about items being processed, including their price
+
     struct ProcessedItemDetail {
         goods_id: i32,
         quantity: i32,
@@ -711,7 +733,6 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
     }
     let mut processed_item_details: Vec<ProcessedItemDetail> = Vec::new();
 
-    // 1. Check stock for all goods, lock rows, and calculate total price
     for item in &data.items {
         let goods_info: Option<(Decimal, i32)> = tx
             .exec_first(
@@ -728,7 +749,6 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
         };
 
         if current_stock < item.quantity {
-            // Insufficient stock
             return Ok(1);
         }
 
@@ -741,7 +761,6 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
         });
     }
 
-    // 2. Check user information and balance, and lock the row
     let user_info: Option<(Decimal, i8)> = tx
         .exec_first(
             "SELECT balance, user_type FROM account WHERE id = :user_id AND user_type = 1 FOR UPDATE",
@@ -750,7 +769,6 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
         .map_err(|e| format!("Failed to query user: {}", e))?;
 
     let (current_balance, _user_type) = match user_info {
-        // user_type is already checked by `user_type = 1` in SQL
         Some(info) => info,
         None => {
             return Err(format!(
@@ -761,11 +779,9 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
     };
 
     if current_balance < total_purchase_price {
-        // Insufficient balance
         return Ok(2);
     }
 
-    // 3. Update goods stock for each item
     for p_item_detail in &processed_item_details {
         tx.exec_drop(
             "UPDATE goods SET stock = stock - :quantity WHERE id = :goods_id",
@@ -782,7 +798,6 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
         })?;
     }
 
-    // 4. Update user balance
     tx.exec_drop(
         "UPDATE account SET balance = balance - :total_price WHERE id = :user_id",
         params! {
@@ -792,7 +807,6 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
     )
     .map_err(|e| format!("Failed to update user balance: {}", e))?;
 
-    // 5. Record consumption for each item
     let current_month_str = Local::now().format("%Y-%m").to_string();
     for p_item_detail in &processed_item_details {
         tx.exec_drop(
@@ -802,17 +816,15 @@ pub fn purchase_goods(data: PurchaseGoodsData, mysql_pool: State<Pool>) -> Resul
                 "user_id" => data.user_id,
                 "month" => &current_month_str,
                 "goods_id" => p_item_detail.goods_id,
-                "amount" => p_item_detail.item_total_price, // Use the total price for this specific item
+                "amount" => p_item_detail.item_total_price,
             },
         )
         .map_err(|e| format!("Failed to record consumption for goods ID {}: {}", p_item_detail.goods_id, e))?;
     }
 
-    // Commit transaction
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
-    // Purchase successful
     Ok(0)
 }
 
@@ -822,7 +834,6 @@ pub fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, Stri
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // Updated query to join with account table for picker and claimer usernames
     let query = "
         SELECT
             li.id,
@@ -853,9 +864,9 @@ pub fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, Stri
                 item_name,
                 pick_place,
                 pick_user_id,
-                pick_user_name, // Added
+                pick_user_name,
                 claim_user_id,
-                claim_user_name, // Added
+                claim_user_name,
                 pick_time,
                 claim_time,
                 status,
@@ -865,9 +876,9 @@ pub fn get_all_lost_items(mysql_pool: State<Pool>) -> Result<Vec<LostItem>, Stri
                     item_name,
                     pick_place,
                     pick_user_id,
-                    pick_user_name, // Added
+                    pick_user_name,
                     claim_user_id,
-                    claim_user_name, // Added
+                    claim_user_name,
                     pick_time,
                     claim_time,
                     status,
@@ -893,7 +904,7 @@ pub fn report_lost_item(
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
     let current_date = Local::now().date_naive();
-    let status: i8 = 0; // 0: Unclaimed
+    let status: i8 = 0;
 
     let result = conn.exec_drop(
         "INSERT INTO lost_items (item_name, pick_place, pick_user_id, pick_time, status) VALUES (:item_name, :pick_place, :pick_user_id, :pick_time, :status)",
@@ -931,9 +942,8 @@ pub fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Resu
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
     let current_date = Local::now().date_naive();
-    let new_status: i8 = 1; // 1: Claimed
+    let new_status: i8 = 1;
 
-    // Check if the item exists and is unclaimed
     let item_status: Option<i8> = conn
         .exec_first(
             "SELECT status FROM lost_items WHERE id = :item_id",
@@ -943,8 +953,6 @@ pub fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Resu
 
     match item_status {
         Some(0) => {
-            // Status 0 means unclaimed
-            // Update item status, claimer user ID, and claim time
             let update_result = conn.exec_drop(
                 "UPDATE lost_items SET status = :status, claim_user_id = :claim_user_id, claim_time = :claim_time WHERE id = :item_id",
                 params! {
@@ -981,7 +989,7 @@ pub fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Resu
             data.item_id
         )),
         None => Err(format!("Lost item with ID {} not found.", data.item_id)),
-        Some(_) => Err(format!("Unknown status for item ID {}.", data.item_id)), // Other unknown status
+        Some(_) => Err(format!("Unknown status for item ID {}.", data.item_id)),
     }
 }
 
@@ -998,7 +1006,6 @@ pub fn admin_send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Res
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // Check if sender_id exists in the account table
     let sender_exists: Option<i64> = conn
         .exec_first(
             "SELECT id FROM account WHERE id = :id",
@@ -1010,10 +1017,9 @@ pub fn admin_send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Res
             "Send message failed: Sender with ID {} not found.",
             data.sender_id
         );
-        return Ok(1); // Sender not found
+        return Ok(1);
     }
 
-    // Check if receiver_id exists in the account table
     let receiver_exists: Option<i64> = conn
         .exec_first(
             "SELECT id FROM account WHERE id = :id",
@@ -1025,11 +1031,11 @@ pub fn admin_send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Res
             "Send message failed: Receiver with ID {} not found.",
             data.receiver_id
         );
-        return Ok(2); // Receiver not found
+        return Ok(2);
     }
 
     let current_date = Local::now().date_naive();
-    let read_status: i8 = 0; // 0: Unread
+    let read_status: i8 = 0;
 
     let result = conn.exec_drop(
         "INSERT INTO message (sender_id, receiver_id, title, message_content, send_date, read_status) VALUES (:sender_id, :receiver_id, :title, :message_content, :send_date, :read_status)",
@@ -1049,7 +1055,7 @@ pub fn admin_send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Res
                 "Message sent successfully from {} to {}",
                 data.sender_id, data.receiver_id
             );
-            Ok(0) // Message sent successfully
+            Ok(0)
         }
         Err(e) => {
             eprintln!("Database insert failed for message: {}", e);
@@ -1071,17 +1077,14 @@ pub fn customer_send_message(
         .get_conn()
         .map_err(|e| format!("Failed to get DB connection: {}", e))?;
 
-    // 1. Find the administrator's ID (user_type = 0)
-    let admin_id_result: Result<Option<i64>, mysql::Error> = conn.exec_first(
-        "SELECT id FROM account WHERE user_type = 0 LIMIT 1", // Assuming one admin
-        (),
-    );
+    let admin_id_result: Result<Option<i64>, mysql::Error> =
+        conn.exec_first("SELECT id FROM account WHERE user_type = 0 LIMIT 1", ());
 
     let admin_id = match admin_id_result {
         Ok(Some(id)) => id,
         Ok(None) => {
             println!("Send message failed: Administrator account (user_type = 0) not found.");
-            return Ok(2); // 2: Administrator (intended receiver) not found
+            return Ok(2);
         }
         Err(e) => {
             eprintln!("Database error while querying for administrator: {}", e);
@@ -1089,7 +1092,6 @@ pub fn customer_send_message(
         }
     };
 
-    // 2. Validate Sender ID (must be a customer, e.g., user_type = 1)
     let sender_info_result: Result<Option<i8>, mysql::Error> = conn.exec_first(
         "SELECT user_type FROM account WHERE id = :sender_id",
         params! {"sender_id" => data.sender_id},
@@ -1113,7 +1115,7 @@ pub fn customer_send_message(
                 "Send message failed: Sender (customer) with ID {} not found.",
                 data.sender_id
             );
-            return Ok(1); // 1: Sender not found
+            return Ok(1);
         }
         Err(e) => {
             eprintln!("Database error while verifying sender: {}", e);
@@ -1122,13 +1124,13 @@ pub fn customer_send_message(
     }
 
     let current_date = Local::now().date_naive();
-    let read_status: i8 = 0; // 0: Unread
+    let read_status: i8 = 0;
 
     let result = conn.exec_drop(
         "INSERT INTO message (sender_id, receiver_id, title, message_content, send_date, read_status) VALUES (:sender_id, :receiver_id, :title, :message_content, :send_date, :read_status)",
         params! {
-            "sender_id" => data.sender_id, // Customer's ID
-            "receiver_id" => admin_id,    // Administrator's ID
+            "sender_id" => data.sender_id,
+            "receiver_id" => admin_id,
             "title" => &data.title,
             "message_content" => &data.message_content,
             "send_date" => current_date,
@@ -1142,7 +1144,7 @@ pub fn customer_send_message(
                 "Message sent successfully from customer {} to administrator {}",
                 data.sender_id, admin_id
             );
-            Ok(0) // 0: Message sent successfully
+            Ok(0)
         }
         Err(e) => {
             eprintln!("Database insert failed for message: {}", e);
@@ -1260,7 +1262,7 @@ pub fn get_recived_messages(
 #[tauri::command]
 pub fn mark_message_as_read(
     data: MarkReadData,
-    current_user_id: i64, // ID of the user performing the action (should be the receiver)
+    current_user_id: i64,
     mysql_pool: State<Pool>,
 ) -> Result<i32, String> {
     let mut conn = mysql_pool
@@ -1305,7 +1307,7 @@ pub fn mark_message_as_read(
                             "Message ID {} marked as read by user ID {}.",
                             data.message_id, current_user_id
                         );
-                        Ok(0) // Successfully marked as read
+                        Ok(0)
                     } else {
                         eprintln!(
                             "Failed to mark message ID {} as read for user ID {}: 0 rows affected despite prior checks.",

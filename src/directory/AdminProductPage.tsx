@@ -1,7 +1,7 @@
 import { AdminUpdateProduct, getProducts } from '@/api/product';
 import AddGoodsBtn from '@/components/AddGoodsBtn';
 import EditGoodsBtn from '@/components/EditGoodsBtn';
-import { Table, Space, TableProps, message } from 'antd';
+import { Table, Space, TableProps } from 'antd';
 import { SortOrder } from 'antd/es/table/interface';
 import React, { useEffect, useState } from 'react';
 
@@ -42,18 +42,15 @@ const AdminProductPage = () => {
 
     // 检查是否有实际需要更新的字段
     if (Object.keys(updateData).length === 0) {
-      message.info('没有需要更新的商品信息。');
       return;
     }
 
     try {
       setLoading(true); // 开始编辑操作，可以设置加载状态
       const result = await AdminUpdateProduct(id, updateData);
-      message.success(result || `商品 "${updatedProduct.goods_name}" 更新成功！`);
       fetchProducts(); // 编辑成功后刷新列表
     } catch (error: any) {
       console.error("更新商品失败:", error);
-      message.error(error.message || '更新商品失败，请稍后重试。');
     } finally {
       setLoading(false); // 结束编辑操作
     }
@@ -68,10 +65,8 @@ const AdminProductPage = () => {
       // 例如，如果后端返回 goods_name, goods_type，需要在这里或 getProducts 函数中进行映射
       // setProducts(fetchedProducts.map(p => ({ id: p.id, goods_name: p.goods_name, price: p.price, stock: p.stock, goods_type: p.goods_type })));
       setProducts(fetchedProducts);
-      message.success('商品信息加载成功！');
     } catch (error) {
       console.error("获取商品失败:", error);
-      message.error('商品信息加载失败，请稍后重试。');
       // 可选：加载失败时可以设置一些默认或空数据
       // setProducts(initialProducts); // 例如，使用之前注释掉的模拟数据作为备用
     } finally {

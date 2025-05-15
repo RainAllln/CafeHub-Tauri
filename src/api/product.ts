@@ -76,6 +76,7 @@ export const AdminUpdateProduct = async (
     // }
 
     const result = await invoke<string>("update_goods_info", payload);
+    console.log(`Product ${goodsId} updated successfully:`, result);
     return result; // Return the success message from the backend
   } catch (error) {
     console.error(`Failed to update product ${goodsId}:`, error);

@@ -1,4 +1,4 @@
-import { AdminUpdateProduct, getProducts } from '@/api/product';
+import { getProducts } from '@/api/product';
 import AddGoodsBtn from '@/components/AddGoodsBtn';
 import EditGoodsBtn from '@/components/EditGoodsBtn';
 import { Table, Space, TableProps } from 'antd';
@@ -33,7 +33,7 @@ const AdminProductPage = () => {
 
   const handleEditProduct = async (updatedProduct: Product) => {
     // 从 updatedProduct 中提取需要发送给后端的数据
-    const { id, stock, price } = updatedProduct;
+    const { stock, price } = updatedProduct;
     const updateData = {
       // 只发送后端 UpdateGoodsData 结构中定义的字段
       ...(stock !== undefined && { stock }), // 确保 stock 存在才添加
@@ -47,7 +47,6 @@ const AdminProductPage = () => {
 
     try {
       setLoading(true); // 开始编辑操作，可以设置加载状态
-      const result = await AdminUpdateProduct(id, updateData);
       fetchProducts(); // 编辑成功后刷新列表
     } catch (error: any) {
       console.error("更新商品失败:", error);

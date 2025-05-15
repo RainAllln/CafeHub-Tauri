@@ -1,5 +1,3 @@
-
-
 pub struct MySQLConfig {
     user: String,
     password: String,

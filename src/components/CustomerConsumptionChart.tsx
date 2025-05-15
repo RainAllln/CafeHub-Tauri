@@ -19,7 +19,6 @@ const CustomerConsumptionChart: React.FC<CustomerConsumptionChartProps> = ({ dat
     yField: 'total_amount',
     height: 268, // 稍微调整高度以适应卡片
     point: { size: 5, shape: 'diamond' as const },
-    tooltip: { fields: ['month', 'total_amount'] },
     yAxis: {
       label: {
         formatter: (v: string) => `¥${Number(v).toFixed(2)}`,
@@ -32,11 +31,11 @@ const CustomerConsumptionChart: React.FC<CustomerConsumptionChartProps> = ({ dat
   };
 
   return (
-    <Card bordered={false} title={<><LineChartOutlined /> 我的月度消费</>}>
+    <Card title={<><LineChartOutlined /> 我的月度消费</>}>
       {data && data.length > 0 ? (
         <Line {...lineConfig} />
       ) : (
-        <Typography.Text style={{display: 'block', textAlign: 'center', padding: '20px'}}>
+        <Typography.Text style={{ display: 'block', textAlign: 'center', padding: '20px' }}>
           暂无消费记录
         </Typography.Text>
       )}

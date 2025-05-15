@@ -15,7 +15,7 @@ const AdminMonthlyConsumptionChart: React.FC<AdminMonthlyConsumptionChartProps> 
     yField: 'total_amount',
     height: 300,
     point: { size: 5, shape: 'diamond' as const }, // as const 用于确保类型正确
-    tooltip: { fields: ['month', 'total_amount'] },
+
     yAxis: {
       label: {
         formatter: (v: string) => `¥${Number(v).toFixed(2)}`,
@@ -24,11 +24,11 @@ const AdminMonthlyConsumptionChart: React.FC<AdminMonthlyConsumptionChartProps> 
     meta: {
       month: { alias: '月份' },
       total_amount: { alias: '总消费额', formatter: (v: number) => `¥${v.toFixed(2)}` },
-    },
+    }
   };
 
   return (
-    <Card bordered={false} title={<><LineChartOutlined /> 月度消费总额趋势</>}>
+    <Card title={<><LineChartOutlined /> 月度消费总额趋势</>}>
       {data.length > 0 ? <Line {...lineConfig} /> : <Typography.Text style={{ display: 'block', textAlign: 'center', padding: '20px' }}>暂无月度消费数据</Typography.Text>}
     </Card>
   );

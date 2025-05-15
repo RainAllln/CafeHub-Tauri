@@ -1,5 +1,3 @@
-// 此文件包含所有 Tauri 命令
-
 use crate::models::*;
 use chrono::{Datelike, Local, NaiveDate};
 use mysql::{params, prelude::Queryable, Error as MySQLError, Pool};

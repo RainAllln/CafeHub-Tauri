@@ -23,12 +23,6 @@ const AdminGoodsShareChart: React.FC<AdminGoodsShareChartProps> = ({ data }) => 
       // content: '{name}\n¥{value}', // 显示名称和数值
       formatter: (datum: any) => `${datum.goods_name}\n¥${datum.amount.toFixed(2)}`,
     },
-    tooltip: {
-      fields: ['goods_name', 'amount', 'percent'],
-      formatter: (datum: any) => {
-        return { name: datum.goods_name, value: `¥${datum.amount.toFixed(2)} (${(datum.percent * 100).toFixed(1)}%)` };
-      },
-    },
     meta: {
       goods_name: { alias: '商品名称' },
       amount: { alias: '消费额', formatter: (v: number) => `¥${v.toFixed(2)}` },
@@ -37,7 +31,7 @@ const AdminGoodsShareChart: React.FC<AdminGoodsShareChartProps> = ({ data }) => 
   };
 
   return (
-    <Card bordered={false} title={<><PieChartOutlined /> 本月商品消费占比</>}>
+    <Card title={<><PieChartOutlined /> 本月商品消费占比</>}>
       {data.length > 0 ? <Pie {...pieConfig} /> : <Typography.Text style={{ display: 'block', textAlign: 'center', padding: '20px' }}>暂无本月商品消费数据</Typography.Text>}
     </Card>
   );

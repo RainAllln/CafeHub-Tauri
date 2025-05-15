@@ -15,7 +15,13 @@ const AdminMonthlyConsumptionChart: React.FC<AdminMonthlyConsumptionChartProps> 
     yField: 'total_amount',
     height: 300,
     point: { size: 5, shape: 'diamond' as const }, // as const 用于确保类型正确
-
+    tooltip: {
+      title:
+        { field: 'month', valueFormatter: (month: string) => { return `当前月份：${month}` } },
+      items: [
+        { name: '总消费额', field: 'total_amount', valueFormatter: (total_amount: number) => { return `￥${total_amount}` } }
+      ]
+    },
     yAxis: {
       label: {
         formatter: (v: string) => `¥${Number(v).toFixed(2)}`,

@@ -19,6 +19,13 @@ const CustomerConsumptionChart: React.FC<CustomerConsumptionChartProps> = ({ dat
     yField: 'total_amount',
     height: 268, // 稍微调整高度以适应卡片
     point: { size: 5, shape: 'diamond' as const },
+    tooltip: {
+      title:
+        { field: 'month', valueFormatter: (month: string) => { return `当前月份：${month}` } },
+      items: [
+        { name: '总消费额', field: 'total_amount', valueFormatter: (total_amount: number) => { return `￥${total_amount}` } }
+      ]
+    },
     yAxis: {
       label: {
         formatter: (v: string) => `¥${Number(v).toFixed(2)}`,

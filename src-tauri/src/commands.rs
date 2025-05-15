@@ -47,7 +47,6 @@ pub fn login(
                     balance,
                     user_type,
                 };
-                println!("Login successful for user: {}", username);
                 Ok(account)
             } else {
                 println!("Login failed for user {}: Invalid password", username);
@@ -109,10 +108,7 @@ pub fn register_user(data: RegistrationData, mysql_pool: State<Pool>) -> Result<
     );
 
     match result {
-        Ok(_) => {
-            println!("Successfully registered user: {}", data.username);
-            Ok(1)
-        }
+        Ok(_) => Ok(1),
         Err(e) => {
             eprintln!("Database insert failed for user {}: {}", data.username, e);
             if let MySQLError::MySqlError(ref mysql_err) = e {
@@ -193,7 +189,6 @@ pub fn update_user_password(
     match update_result {
         Ok(_) => {
             if conn.affected_rows() > 0 {
-                println!("Successfully updated password for user ID: {}", user_id);
                 Ok("Password updated successfully.".to_string())
             } else {
                 Err("Failed to update password, user not found or no change made.".to_string())
@@ -291,7 +286,6 @@ pub fn get_goods_consumption_share_current_month(
 
     let now = Local::now();
     let current_month_str = now.format("%Y-%m").to_string();
-    println!("[RUST DEBUG] get_goods_consumption_share_current_month: Determined current_month_str = '{}'", current_month_str);
 
     let query = "
         SELECT g.goods_name, SUM(c.amount) as consumed_amount
@@ -309,17 +303,7 @@ pub fn get_goods_consumption_share_current_month(
             amount: amount_val,
         },
     ) {
-        Ok(results) => {
-            println!("[RUST DEBUG] get_goods_consumption_share_current_month: Query successful. Results count = {}", results.len());
-            if results.is_empty() {
-                println!("[RUST DEBUG] get_goods_consumption_share_current_month: No goods consumption data found for month '{}'", current_month_str);
-            } else {
-                for (index, item) in results.iter().take(3).enumerate() {
-                    println!("[RUST DEBUG] get_goods_consumption_share_current_month: Result[{}]: Name='{}', Amount='{}'", index, item.goods_name, item.amount);
-                }
-            }
-            Ok(results)
-        }
+        Ok(results) => Ok(results),
         Err(e) => {
             eprintln!(
                 "[RUST ERROR] Database query failed for current month goods consumption share (month: {}): {}",
@@ -511,16 +495,8 @@ pub fn get_all_goods(mysql_pool: State<Pool>) -> Result<Vec<Goods>, String> {
             goods_type,
             price,
             stock,
-        }).map(|items| {
-            println!("[RUST DEBUG] get_all_goods: Query successful. Fetched {} goods items.", items.len());
-            for (index, item) in items.iter().enumerate() {
-            println!(
-                "[RUST DEBUG] get_all_goods: Item[{}]: ID={}, Name='{}', Type='{:?}', Price={}, Stock={:?}",
-                index, item.id, &item.goods_name, &item.goods_type, &item.price, &item.stock
-            );
-            }
-            items
         })
+        .map(|items| items)
         .map_err(|e| format!("Database query failed for all goods: {}", e))?;
 
     Ok(results)
@@ -552,10 +528,7 @@ pub fn add_goods(data: AddGoodsData, mysql_pool: State<Pool>) -> Result<String, 
     );
 
     match result {
-        Ok(_) => {
-            println!("Successfully added goods: {}", data.goods_name);
-            Ok(format!("Goods '{}' added successfully.", data.goods_name))
-        }
+        Ok(_) => Ok(format!("Goods '{}' added successfully.", data.goods_name)),
         Err(e) => {
             eprintln!(
                 "Database insert failed for goods {}: {}",
@@ -617,7 +590,6 @@ pub fn update_goods_info(
     match conn.exec_drop(&query, mysql::Params::from(query_params)) {
         Ok(_) => {
             if conn.affected_rows() > 0 {
-                println!("Successfully updated info for goods ID: {}", goods_id);
                 Ok(format!(
                     "Info for goods ID {} updated successfully.",
                     goods_id
@@ -672,10 +644,6 @@ pub fn recharge_balance(
             match update_result {
                 Ok(_) => {
                     if conn.affected_rows() > 0 {
-                        println!(
-                            "Successfully recharged {} for user ID: {}. New balance might be reflected in a subsequent query.",
-                            data.amount, data.user_id
-                        );
                         Ok(format!(
                             "Successfully recharged {} for user ID {}.",
                             data.amount, data.user_id
@@ -918,13 +886,10 @@ pub fn report_lost_item(
     );
 
     match result {
-        Ok(_) => {
-            println!("Successfully reported lost item: {}", data.item_name);
-            Ok(format!(
-                "Lost item '{}' reported successfully.",
-                data.item_name
-            ))
-        }
+        Ok(_) => Ok(format!(
+            "Lost item '{}' reported successfully.",
+            data.item_name
+        )),
         Err(e) => {
             eprintln!(
                 "Database insert failed for lost item {}: {}",
@@ -966,10 +931,6 @@ pub fn claim_lost_item(data: ClaimLostItemData, mysql_pool: State<Pool>) -> Resu
             match update_result {
                 Ok(_) => {
                     if conn.affected_rows() > 0 {
-                        println!(
-                            "Lost item ID {} claimed successfully by user ID {}.",
-                            data.item_id, data.claim_user_id
-                        );
                         Ok(format!("Item ID {} claimed successfully.", data.item_id))
                     } else {
                         Err(format!("Failed to update item ID {}. It might have been claimed or deleted concurrently.", data.item_id))
@@ -1050,13 +1011,7 @@ pub fn admin_send_message(data: SendMessageData, mysql_pool: State<Pool>) -> Res
     );
 
     match result {
-        Ok(_) => {
-            println!(
-                "Message sent successfully from {} to {}",
-                data.sender_id, data.receiver_id
-            );
-            Ok(0)
-        }
+        Ok(_) => Ok(0),
         Err(e) => {
             eprintln!("Database insert failed for message: {}", e);
             Err(format!("Database error while sending message: {}", e))
@@ -1139,13 +1094,7 @@ pub fn customer_send_message(
     );
 
     match result {
-        Ok(_) => {
-            println!(
-                "Message sent successfully from customer {} to administrator {}",
-                data.sender_id, admin_id
-            );
-            Ok(0)
-        }
+        Ok(_) => Ok(0),
         Err(e) => {
             eprintln!("Database insert failed for message: {}", e);
             Err(format!("Database error while sending message: {}", e))
@@ -1303,10 +1252,6 @@ pub fn mark_message_as_read(
             match update_result {
                 Ok(_) => {
                     if conn.affected_rows() > 0 {
-                        println!(
-                            "Message ID {} marked as read by user ID {}.",
-                            data.message_id, current_user_id
-                        );
                         Ok(0)
                     } else {
                         eprintln!(

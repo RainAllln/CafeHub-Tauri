@@ -17,15 +17,6 @@ interface Product {
 // 模拟商品类别
 const initialCategories = ['咖啡类', '非咖啡饮品', '烘焙食品', '轻食简餐', '咖啡豆与周边'];
 
-// // 模拟初始商品数据
-// const initialProducts: Product[] = [
-//   { id: 1, goods_name: '摩卡', price: 19.00, stock: 50, goods_type: '咖啡类' },
-//   { id: 2, goods_name: '蛋糕', price: 29.00, stock: 120, goods_type: '烘焙食品' },
-//   { id: 3, goods_name: '奇异果', price: 10.00, stock: 200, goods_type: '咖啡类' },
-//   { id: 4, goods_name: '妙脆角', price: 3.00, stock: 30, goods_type: '咖啡类' },
-//   { id: 5, goods_name: '是否打包', price: 1.00, stock: 10000, goods_type: '咖啡类' },
-// ];
-
 const AdminProductPage = () => {
   const [products, setProducts] = useState<Product[]>([]); // 商品列表
   const [categories] = useState<string[]>(initialCategories);

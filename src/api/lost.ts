@@ -26,10 +26,8 @@ interface ReportLostItemPayload {
 export const getAllLostItems = async (): Promise<LostItem[]> => {
     try {
         const items = await invoke<LostItem[]>('get_all_lost_items');
-        console.log("Fetched lost items:", items);
         return items;
     } catch (error) {
-        console.error("Failed to fetch lost items:", error);
         // Consider re-throwing the error or returning a more specific error object
         // if the caller needs to handle it differently.
         throw error; // Re-throw to allow caller to handle
@@ -41,7 +39,6 @@ export const claimLostItem = async (itemId: number, claim_user_id: number): Prom
         await invoke('claim_lost_item', { data: { item_id: itemId, claim_user_id: claim_user_id } });
         return 0;
     } catch (err) {
-        console.error("Failed to claim item:", err);
         return 1;
     }
 }
@@ -49,9 +46,7 @@ export const claimLostItem = async (itemId: number, claim_user_id: number): Prom
 export const reportLostItem = async (reportData: ReportLostItemPayload): Promise<void> => {
     try {
         await invoke('report_lost_item', { data: reportData });
-        console.log("Lost item reported successfully:", reportData);
     } catch (error) {
-        console.error("Failed to report lost item:", error);
         throw error; // Re-throw to allow caller to handle
     }
 }

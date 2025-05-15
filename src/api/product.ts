@@ -42,7 +42,6 @@ export interface PurchaseGoodsPayload {
 export const getProducts = async (): Promise<Product[]> => {
   try {
     const products = await invoke<Product[]>("get_all_goods");
-    console.log("Fetched products:", products);
     return products;
   } catch (error) {
     console.error("Failed to fetch products:", error);
@@ -77,7 +76,6 @@ export const AdminUpdateProduct = async (
     // }
 
     const result = await invoke<string>("update_goods_info", payload);
-    console.log(`Product ${goodsId} update result:`, result);
     return result; // Return the success message from the backend
   } catch (error) {
     console.error(`Failed to update product ${goodsId}:`, error);
@@ -102,7 +100,6 @@ export const addProduct = async (data: AddProductData): Promise<string> => {
   try {
     // The Rust command `add_goods` expects `data` as its argument.
     const result = await invoke<string>("add_goods", { data });
-    console.log(`Add product result:`, result);
     return result; // Return the success message from the backend
   } catch (error) {
     console.error(`Failed to add product:`, error);
@@ -131,7 +128,6 @@ export const purchaseGoods = async (payload: PurchaseGoodsPayload): Promise<numb
     // The Rust command `purchase_goods` expects `data` as its argument,
     // which corresponds to the `PurchaseGoodsData` struct.
     const result = await invoke<number>("purchase_goods", { data: payload });
-    console.log(`Purchase goods result for user ${payload.user_id}:`, result);
     return result;
   } catch (error) {
     console.error(`Failed to purchase goods for user ${payload.user_id}:`, error);

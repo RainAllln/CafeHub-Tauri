@@ -30,37 +30,17 @@ const RegisterPage = () => {
 
   const handleRegister = async () => {
     try {
-      // 调用登录接口
-      let res = await register(username, password, phone, gendedr);
-      if (res == 1) {
-        // 登录成功，跳转到首页
+      // 调用注册接口
+      let account = await register(username, password, phone, gendedr);
+      messageApi.open({
+        type: 'success',
+        content: '注册成功',
+        duration: 2,
+      });
+      localStorage.setItem('loginAccount', JSON.stringify(account));
+      localStorage.setItem('isAuthenticated', 'true');
+      if (account != null && account.user_type === 1) {
         navigate('/customer');
-        messageApi.open({
-          type: 'success',
-          content: '注册成功',
-          duration: 2,
-        });
-      } else if (res == 2) {
-        console.log('用户重复');
-        messageApi.open({
-          type: 'error',
-          content: '注册失败，用户名已存在',
-          duration: 2,
-        });
-      } else if (res == 3) {
-        console.log('手机号不是11位');
-        messageApi.open({
-          type: 'error',
-          content: '注册失败，手机号不是11位',
-          duration: 2,
-        });
-      } else if (res == 4) {
-        console.log('性别设置错误');
-        messageApi.open({
-          type: 'error',
-          content: '注册失败，性别设置错误',
-          duration: 2,
-        });
       }
     } catch (error) {
       console.error('注册接口调用失败', error);

@@ -36,10 +36,22 @@ export const register = async (uname: string, pwd: string, phe: string, gen: num
         gender: gen, // Or pass actual gender if available (0 for Male, 1 for Female)
       },
     });
-    return res;
+    let account: Account | null = null;
+    if (res == 1) {
+      //注册成功
+      account = await login(uname, pwd);
+      return account;
+    } else if (res == 2) {
+      throw new Error('用户名重复');
+    } else if (res == 3) {
+      throw new Error('手机号不是11位');
+    } else if (res == 4) {
+      throw new Error('性别设置错误');
+    }
+    return account;
   } catch (error) {
     console.error("register failed:", error);
-    return false;
+    throw error;
   }
 };
 

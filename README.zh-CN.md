@@ -1,14 +1,14 @@
-# 萃豆馆 - 自助咖啡馆管理系统
+# 萃豆馆 - 自助咖啡厅管理系统
 
-[![Windows](https://img.shields.io/badge/platform-Windows-blue)](https://www.microsoft.com/windows) [![Rust](https://img.shields.io/badge/language-Rust-orange)](https://www.rust-lang.org/) [![Tauri](https://img.shields.io/badge/framework-Tauri-green)](https://tauri.app/) [![React](https://img.shields.io/badge/library-React-blue)](https://reactjs.org/) [![MySQL](https://img.shields.io/badge/database-MySQL-blue)](https://www.mysql.com/) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/RainAllln/CafeHub-Tauri)
+[![Windows](https://img.shields.io/badge/平台-Windows-blue)](https://www.microsoft.com/windows) [![Rust](https://img.shields.io/badge/语言-Rust-orange)](https://www.rust-lang.org/) [![Tauri](https://img.shields.io/badge/框架-Tauri-green)](https://tauri.app/) [![React](https://img.shields.io/badge/工具库-React-blue)](https://reactjs.org/) [![MySQL](https://img.shields.io/badge/数据库-MySQL-blue)](https://www.mysql.com/) [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/RainAllln/CafeHub-Tauri)
 
 [English](README.md) | 简体中文
 
-这是一个软件工程课程项目，一个自助咖啡馆管理系统。
+这是一个软件工程课程项目，一个自助咖啡厅管理系统。
 
 ## 项目概述
 
-萃豆馆是一款使用 Tauri、React、TypeScript 和 Rust 构建的桌面应用程序，旨在管理自助咖啡馆的各个方面。它为顾客和管理员提供了一个用户友好的界面。
+萃豆馆是一款使用 Tauri、React、TypeScript 和 Rust 构建的桌面应用程序，旨在管理自助咖啡厅的各个方面。它为顾客和管理员提供了一个用户友好的界面。
 
 ## 功能特性
 
